@@ -21,6 +21,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     private val art=PixelArt(context.assets)
     private val backgrounds=BackgroundArt(context.assets)
     private val battleEffects=BattleEffects()
+    private val playerEffects=PlayerEffects()
     private val p=Paint().apply { isAntiAlias=false }
     private val type=Paint().apply { isAntiAlias=true; typeface=Typeface.create("sans-serif",Typeface.NORMAL) }
     private val buttons=mutableListOf<UiButton>()
@@ -312,15 +313,11 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             val a=i*PI/4; val x=300+cos(a)*215; val y=170+sin(a)*146
             pixel(c,"${i+1}",x.toFloat(),y.toFloat(),1.4f,Ink.mid,true)
         }
+        playerEffects.ground(c,e)
         e.impacts.forEach { battleEffects.impact(c,it,b.id) }
         e.hazards.forEach { battleEffects.telegraph(c,it,b.id) }
         e.hazards.firstOrNull { !it.resolved }?.let {
             battleEffects.charge(c,e.boss.x,e.boss.y,it.time/it.delay,it.ultimate,b.id)
-        }
-        e.iceMarks.forEach { m ->
-            p.style=Paint.Style.STROKE; p.strokeWidth=2f; p.color=Ink.light
-            c.drawCircle(m.x.toFloat(),m.y.toFloat(),m.radius.toFloat(),p); p.style=Paint.Style.FILL
-            art.icon(c,"ice",m.x.toFloat()-8,m.y.toFloat()-8,1f)
         }
         val motion=e.bossMove
         motion?.let { battleEffects.movement(c,it,b.id) }
@@ -339,7 +336,8 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         c.drawOval(e.boss.x.toFloat()-34,e.boss.y.toFloat()-9,e.boss.x.toFloat()+34,e.boss.y.toFloat()+17,p)
         p.style=Paint.Style.FILL
         for(s in e.summons) {
-            art.sprite(c,when(s.kind) { 0 -> "giant"; 1 -> "rabbit"; else -> "haniwa" },s.x.toFloat(),s.y.toFloat(),if(s.kind==0) 1.2f else .85f)
+            val summonScale=(if(s.kind==0) 1.2 else .85)*(1+.20*Skills.progress(s.level))
+            art.sprite(c,when(s.kind) { 0 -> "giant"; 1 -> "rabbit"; else -> "haniwa" },s.x.toFloat(),s.y.toFloat(),summonScale.toFloat())
             bar(c,s.x.toFloat()-14,s.y.toFloat()+8,28f,5f,s.life,20.0)
         }
         val px=e.player.x.toFloat(); val py=e.player.y.toFloat()
@@ -349,25 +347,19 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         }
         val alpha=if((e.buffs["invisible"] ?: .0)>0) 85 else if(e.invulnerability>0) 155 else 255
         art.sprite(c,art.heroKey(e.job),px,py,1.15f,alpha=alpha)
-        // A visible foot marker is the actual seven-unit collision circle.
-        p.style=Paint.Style.STROKE; p.color=Ink.light; p.strokeWidth=2f; c.drawCircle(px,py,7f,p); p.style=Paint.Style.FILL
-        rect(c,px-2,py-2,4f,4f,Ink.light)
-        if((e.buffs["shield"] ?: .0)>0 || (e.buffs["armor"] ?: .0)>0) {
+        if((e.buffs["armor"] ?: .0)>0) {
             p.style=Paint.Style.STROKE; p.strokeWidth=2f; c.drawCircle(px,py-15,24f,p); p.style=Paint.Style.FILL
         }
         if(e.restTime>0) { pixel(c,"REST",px,py-61,1.25f,Ink.light,true); bar(c,px-24,py-48,48f,7f,2-e.restTime,2.0) }
-        e.projectiles.forEach { pr ->
-            if(pr.kind=="fire") art.icon(c,"fire",pr.x.toFloat()-7,pr.y.toFloat()-8,1f)
-            else { p.color=Ink.light; p.strokeWidth=3f; val a=atan2(pr.vy,pr.vx); c.drawLine(pr.x.toFloat(),pr.y.toFloat(),(pr.x-cos(a)*13).toFloat(),(pr.y-sin(a)*13).toFloat(),p) }
-        }
+        e.projectiles.forEach { playerEffects.projectile(c,it) }
         e.particles.forEach { q ->
-            if(q.text=="SLASH" || q.text=="HANIWA") {
-                p.style=Paint.Style.STROKE; p.strokeWidth=5f; p.color=Ink.light
-                c.drawArc(q.x.toFloat()-28,q.y.toFloat()-28,q.x.toFloat()+28,q.y.toFloat()+28,190f,150f,false,p); p.style=Paint.Style.FILL
-            } else if(q.text=="BURST"||q.text=="ICE"||q.text=="HIT") {
-                art.icon(c,if(q.text=="ICE") "ice" else "boost",q.x.toFloat()-16,q.y.toFloat()-16,2f)
-            } else { pixel(c,q.text.replace('−','-'),q.x.toFloat()+1,q.y.toFloat()+1,1.7f,Ink.dark,true); pixel(c,q.text.replace('−','-'),q.x.toFloat(),q.y.toFloat(),1.7f,Ink.light,true) }
+            pixel(c,q.text.replace('−','-'),q.x.toFloat()+1,q.y.toFloat()+1,1.7f,Ink.dark,true)
+            pixel(c,q.text.replace('−','-'),q.x.toFloat(),q.y.toFloat(),1.7f,Ink.light,true)
         }
+        // The seven-unit collision marker stays above every skill and damage number.
+        p.style=Paint.Style.STROKE; p.color=Ink.dark; p.strokeWidth=4f; c.drawCircle(px,py,7f,p)
+        p.color=Ink.light; p.strokeWidth=2f; c.drawCircle(px,py,7f,p); p.style=Paint.Style.FILL
+        rect(c,px-2,py-2,4f,4f,Ink.light)
         c.restore()
         // Cast information stays outside the playfield so it never hides a telegraph.
         if(e.castEnd>e.elapsed) {
@@ -480,8 +472,10 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             art.icon(c,s.glyph,x+14,y+17,2f)
             text(c,s.name,x+62,y+36,15f)
             text(c,if(e.levels[i]>=16) "Lv.16 MAX" else "Lv.${e.levels[i]} → ${e.levels[i]+1}",x+16,y+70,20f)
-            text(c,Skills.detail(e.job,i,e.levels[i]+if(selected) 1 else 0),x+16,y+99,11f,Ink.mid)
-            if(!thief) wrap(c,s.description,x+16,y+123,178f,12f,Ink.mid,19f)
+            val preview=e.levels[i]+if(selected) 1 else 0
+            text(c,Skills.detail(e.job,i,preview),x+16,y+if(thief) 91 else 99,11f,Ink.mid)
+            text(c,Skills.rangeDetail(e.job,i,preview),x+16,y+if(thief) 107 else 117,10f,if(selected) Ink.light else Ink.mid)
+            if(!thief) wrap(c,s.description,x+16,y+135,178f,11f,Ink.mid,16f)
             buttons.add(UiButton("${s.name}を選択",RectF(x,y,x+211,y+(if(thief) 113 else 157)),e.levels[i]<16) { e.selectUpgrade(i) })
         }
         if(thief) {

@@ -13,9 +13,9 @@ data class Run(
     fun copyForTrial() = Run(job, stage, levels.copyOf(), inventory = mutableListOf())
 }
 data class Actor(var x: Double, var y: Double, var hp: Double, var maxHp: Double, var facing: Double = -PI/2)
-data class Summon(val kind: Int, var x: Double, var y: Double, var life: Double, var timer: Double = .1)
-data class Projectile(var x: Double, var y: Double, val vx: Double, val vy: Double, val power: Double, val radius: Double, val kind: String, var life: Double = 3.0)
-data class IceMark(var x: Double, var y: Double, val power: Double, val radius: Double, var time: Double = .75)
+data class Summon(val kind: Int, var x: Double, var y: Double, var life: Double, var timer: Double = .1, val level: Int=1)
+data class Projectile(var x: Double, var y: Double, val vx: Double, val vy: Double, val power: Double, val radius: Double, val kind: String, var life: Double = 3.0, val level: Int=1, var distanceLeft: Double=Double.POSITIVE_INFINITY)
+data class IceMark(var x: Double, var y: Double, val power: Double, val radius: Double, var time: Double = .75, val level: Int=1)
 data class Particle(var x: Double, var y: Double, val text: String, var life: Double = .85, val good: Boolean = false)
 data class Hazard(
     val shape: String, var x: Double, var y: Double, val a: Double, val b: Double = 0.0,
@@ -74,6 +74,7 @@ class GameEngine(random: Random=Random.Default) {
     private var idleTargetY=125.0
     private var nextIdleTarget=0.0
     val particles = mutableListOf<Particle>()
+    val playerEffects = mutableListOf<PlayerEffect>()
     val cues = mutableListOf<Cue>()
     val normalCues = mutableListOf<NormalCue>()
     val sounds = mutableListOf<String>()
@@ -136,7 +137,7 @@ class GameEngine(random: Random=Random.Default) {
         player=Actor(300.0,265.0,job.hp,job.hp)
         boss=Actor(300.0,125.0,1e12,1e12)
         gauge=100.0; cooldowns.fill(0.0); buffs.clear(); summons.clear(); projectiles.clear(); iceMarks.clear()
-        hazards.clear(); impacts.clear(); particles.clear(); cues.clear(); normalCues.clear(); sounds.clear(); director.reset()
+        hazards.clear(); impacts.clear(); particles.clear(); playerEffects.clear(); cues.clear(); normalCues.clear(); sounds.clear(); director.reset()
         bossMove=null; bossOldX=boss.x; bossOldY=boss.y; nextIdleTarget=0.0
         elapsed=0.0; damageTaken=0.0; damageDone=0.0; restTime=0.0; invulnerability=0.0
         ultimateUsed=false; ultimateCount=0; cutinTime=0.0; patternNumber=0; nextPattern=1.6*BossTiming.SCALE
@@ -181,7 +182,7 @@ class GameEngine(random: Random=Random.Default) {
         if(gauge<cost) { notify("ゲージの回復を待とう"); return false }
         val d=hypot(player.x-boss.x,player.y-boss.y)
         val range=Skills.range(job,slot,levels[slot])
-        if ((job==Job.WARRIOR&&slot==0 || job==Job.THIEF&&slot<2 || haniwa) && d>range+22) {
+        if ((job==Job.WARRIOR&&slot==0 || job==Job.THIEF&&slot<2 || haniwa) && d>range+PlayerAttackGeometry.BOSS_RADIUS) {
             notify("もう少しボスに近づこう"); return false
         }
         if (job==Job.SUMMONER && slot<3 && !haniwa && summons.size>=2) {
@@ -192,38 +193,49 @@ class GameEngine(random: Random=Random.Default) {
         }
         if (slot==3 && player.hp>=player.maxHp) { notify("HPは満タン"); return false }
         gauge-=cost; cooldowns[slot]=Skills.cooldown(job,slot,levels[slot])
-        if(slot==3) { restTime=2.0; sounds.add("rest"); return true }
+        if(slot==3) { restTime=2.0; effect(PlayerEffectKind.REST,player.x,player.y,Skills.auraRadius(levels[3]),levels[3]); sounds.add("rest"); return true }
         player.facing=atan2(boss.y-player.y,boss.x-player.x)
         when(job) {
             Job.WARRIOR -> when(slot) {
-                0 -> { damageBoss(power(0)); slash("SLASH","sword") }
-                1 -> { buffs["shield"]=4.0+4*Skills.progress(levels[1]); sounds.add("shield") }
-                2 -> shoot(power(2),6.0,"arrow",370.0)
+                0 -> { damageBoss(power(0)); slash(PlayerEffectKind.SWORD,0,"sword") }
+                1 -> { buffs["shield"]=4.0+4*Skills.progress(levels[1]); effect(PlayerEffectKind.SHIELD,player.x,player.y,Skills.auraRadius(levels[1]),levels[1]); sounds.add("shield") }
+                2 -> shoot(power(2),Skills.arrowRadius(levels[2]),"arrow",370.0,2,range)
             }
             Job.MAGE -> when(slot) {
-                0 -> shoot(power(0),range,"fire",290.0)
-                1 -> { iceMarks.add(IceMark(boss.x,boss.y,power(1),range)); sounds.add("ice") }
-                2 -> { buffs["focus"]=5.0+4*Skills.progress(levels[2]); sounds.add("focus") }
+                0 -> shoot(power(0),range,"fire",290.0,0)
+                1 -> { iceMarks.add(IceMark(boss.x,boss.y,power(1),range,level=levels[1])); sounds.add("ice") }
+                2 -> { buffs["focus"]=5.0+4*Skills.progress(levels[2]); effect(PlayerEffectKind.FOCUS,player.x,player.y,Skills.auraRadius(levels[2]),levels[2]); sounds.add("focus") }
             }
-            Job.SUMMONER -> if(haniwa) { damageBoss(power(2)); slash("HANIWA","haniwa") } else {
-                summons.add(Summon(slot,player.x+(if(summons.isEmpty()) -27 else 27),player.y-20,12.0+8*Skills.progress(levels[slot])))
+            Job.SUMMONER -> if(haniwa) { damageBoss(power(2)); slash(PlayerEffectKind.HANIWA,2,"haniwa") } else {
+                val summon=Summon(slot,player.x+(if(summons.isEmpty()) -27 else 27),player.y-20,12.0+8*Skills.progress(levels[slot]),level=levels[slot])
+                summons.add(summon)
+                effect(listOf(PlayerEffectKind.SUMMON_GIANT,PlayerEffectKind.SUMMON_RABBIT,PlayerEffectKind.SUMMON_HANIWA)[slot],summon.x,summon.y,Skills.auraRadius(summon.level),summon.level)
                 sounds.add(when(slot) { 0 -> "summon-giant"; 1 -> "summon-rabbit"; else -> "summon-haniwa" })
             }
             Job.THIEF -> when(slot) {
-                0 -> { damageBoss(power(0)); slash("SLASH","knife") }
+                0 -> { damageBoss(power(0)); slash(PlayerEffectKind.KNIFE,0,"knife") }
                 1 -> {
                     val item=Item.entries.filter { it.special }[(run!!.stage + levels[1]-1)%4]
                     run!!.inventory.add(item); stolen=true; notify("${item.title}を盗んだ！"); sounds.add("coin")
+                    effect(PlayerEffectKind.STEAL,boss.x,boss.y,min(d,range+PlayerAttackGeometry.BOSS_RADIUS),levels[1],atan2(player.y-boss.y,player.x-boss.x))
                 }
-                2 -> { buffs["speed"]=5.0+4*Skills.progress(levels[2]); sounds.add("speed") }
+                2 -> { buffs["speed"]=5.0+4*Skills.progress(levels[2]); effect(PlayerEffectKind.SPEED,player.x,player.y,Skills.auraRadius(levels[2]),levels[2],player.facing); sounds.add("speed") }
             }
         }
         return true
     }
-    private fun slash(text: String,sound: String) { if(!trial) { particles.add(Particle((player.x+boss.x)/2,(player.y+boss.y)/2,text,.22)); sounds.add(sound) } }
-    private fun shoot(power: Double, radius: Double, kind: String, speed: Double) {
+    private fun effect(kind: PlayerEffectKind,x: Double,y: Double,radius: Double,level: Int,angle: Double=0.0) {
+        if(trial) return
+        if(playerEffects.size>=PlayerEffect.LIMIT) playerEffects.removeAt(0)
+        playerEffects.add(PlayerEffect(kind,x,y,radius,level.coerceIn(1,16),angle))
+    }
+    private fun slash(kind: PlayerEffectKind,slot: Int,sound: String) {
+        effect(kind,player.x,player.y,Skills.range(job,slot,levels[slot]),levels[slot],player.facing)
+        if(!trial) sounds.add(sound)
+    }
+    private fun shoot(power: Double, radius: Double, kind: String, speed: Double,slot: Int,distance: Double=870.0) {
         val a=atan2(boss.y-player.y,boss.x-player.x)
-        projectiles.add(Projectile(player.x,player.y,cos(a)*speed,sin(a)*speed,power,radius,kind))
+        projectiles.add(Projectile(player.x,player.y,cos(a)*speed,sin(a)*speed,power,radius,kind,level=levels[slot],distanceLeft=distance))
         if(!trial) sounds.add(kind)
     }
     fun damageBoss(amount: Double) {
@@ -252,9 +264,10 @@ class GameEngine(random: Random=Random.Default) {
         nextPattern=elapsed+(bossInfo.sequence.size*2.2+1.3)*BossTiming.SCALE
         castHint=bossInfo.hint
     }
-    fun heal(value: Double) {
+    fun heal(value: Double,level: Int=1) {
         val actual=min(player.maxHp-player.hp,value); player.hp+=actual
         if(!trial && actual>.1) { particles.add(Particle(player.x,player.y-20,"+${actual.roundToInt()}",good=true)); sounds.add("heal") }
+        if(actual>.1) effect(PlayerEffectKind.HEAL,player.x,player.y,Skills.auraRadius(level),level)
     }
     fun hurt(amount: Double, sourceX: Double=boss.x, sourceY: Double=boss.y, frontal: Boolean=false) {
         if(invulnerability>0 || (buffs["invisible"] ?: 0.0)>0 || screen!=Screen.BATTLE) return
@@ -313,12 +326,13 @@ class GameEngine(random: Random=Random.Default) {
         if(screen!=Screen.BATTLE) return
         val playerOldX=player.x; val playerOldY=player.y
         impacts.forEach { it.age+=dt }; impacts.removeAll { it.age>=it.lifetime }
+        playerEffects.forEach { it.age+=dt }; playerEffects.removeAll { it.age>=it.lifetime }
         if(!trial) { hazards.forEach { it.time+=dt }; advanceBoss(dt) }
         elapsed+=dt; messageTime=max(0.0,messageTime-dt); invulnerability=max(0.0,invulnerability-dt)
         for(i in cooldowns.indices) cooldowns[i]=max(0.0,cooldowns[i]-dt)
         buffs.keys.toList().forEach { buffs[it]=max(0.0,buffs.getValue(it)-dt) }
         gauge=min(100.0,gauge+dt*(if(job==Job.SUMMONER) 10.0 else 20.0))
-        if(restTime>0) { restTime-=dt; if(restTime<=0) heal(Skills.power(job,3,levels[3])) }
+        if(restTime>0) { restTime-=dt; if(restTime<=0) heal(Skills.power(job,3,levels[3]),levels[3]) }
         else {
             val len=hypot(moveX,moveY).coerceAtLeast(1.0)
             val speed=job.speed*(if((buffs["speed"] ?: 0.0)>0) 1+.8*Skills.fraction(levels[2]) else 1.0)*(if((buffs["haste"] ?: 0.0)>0) 1.5 else 1.0)
@@ -336,32 +350,41 @@ class GameEngine(random: Random=Random.Default) {
             s.x+=(tx-s.x)*min(1.0,dt*6); s.y+=(ty-s.y)*min(1.0,dt*6)
             if(s.timer<=0) {
                 s.timer+=if(s.kind==1) 2.0 else 1.0
-                if(s.kind==0 && hypot(s.x-boss.x,s.y-boss.y)<Skills.range(job,0,levels[0])+25) {
+                if(s.kind==0 && hypot(s.x-boss.x,s.y-boss.y)<Skills.range(job,0,s.level)+PlayerAttackGeometry.BOSS_RADIUS) {
                     damageBoss(power(0))
-                    if(!trial) { sounds.add("giant-hit"); particles.add(Particle(boss.x,boss.y,"HANIWA",.22)) }
+                    effect(PlayerEffectKind.GIANT,s.x,s.y,Skills.range(job,0,s.level),s.level,atan2(boss.y-s.y,boss.x-s.x))
+                    if(!trial) sounds.add("giant-hit")
                 }
-                if(s.kind==1) heal(Skills.power(job,1,levels[1]))
+                if(s.kind==1 && hypot(s.x-player.x,s.y-player.y)<=Skills.range(job,1,s.level)) heal(Skills.power(job,1,s.level),s.level)
             }
         }
         summons.removeAll { it.life<=0 }
         if(screen!=Screen.BATTLE) return
         for(p in projectiles.toList()) {
             val px=p.x; val py=p.y
-            p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt
+            p.life-=dt
+            val speed=hypot(p.vx,p.vy); val travel=min(speed*dt,p.distanceLeft.coerceAtLeast(0.0))
+            val step=if(speed>0) travel/speed else 0.0
+            p.x+=p.vx*step; p.y+=p.vy*step; p.distanceLeft-=travel
             val oldX=if(trial || bossTeleported) boss.x else bossOldX
             val oldY=if(trial || bossTeleported) boss.y else bossOldY
-            if(BossMobility.segmentDistance(px-oldX,py-oldY,p.x-boss.x,p.y-boss.y)<28+p.radius*.3) {
+            val contact=PlayerAttackGeometry.contactFraction(px-oldX,py-oldY,p.x-boss.x,p.y-boss.y,PlayerAttackGeometry.BOSS_RADIUS+p.radius)
+            if(contact!=null) {
+                p.x=px+(p.x-px)*contact; p.y=py+(p.y-py)*contact
                 damageBoss(p.power); p.life=0.0
-                if(!trial) { particles.add(Particle(p.x,p.y,if(p.kind=="fire") "BURST" else "HIT",.25)); sounds.add("${p.kind}-hit") }
+                effect(if(p.kind=="fire") PlayerEffectKind.FIRE else PlayerEffectKind.ARROW,p.x,p.y,p.radius,p.level,atan2(p.vy,p.vx))
+                if(!trial) sounds.add("${p.kind}-hit")
             }
+            if(p.distanceLeft<=0) p.life=0.0
         }
         projectiles.removeAll { it.life<=0 }
         for(mark in iceMarks.toList()) {
             if(mark.time>.35) { mark.x=boss.x; mark.y=boss.y }
             mark.time-=dt
             if(mark.time<=0) {
-                if(hypot(mark.x-boss.x,mark.y-boss.y)<mark.radius+25) damageBoss(mark.power)
-                if(!trial) { particles.add(Particle(mark.x,mark.y,"ICE",.3)); sounds.add("ice-hit") }
+                if(hypot(mark.x-boss.x,mark.y-boss.y)<mark.radius+PlayerAttackGeometry.BOSS_RADIUS) damageBoss(mark.power)
+                effect(PlayerEffectKind.ICE,mark.x,mark.y,mark.radius,mark.level)
+                if(!trial) sounds.add("ice-hit")
             }
         }
         iceMarks.removeAll { it.time<=0 }

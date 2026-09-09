@@ -36,6 +36,13 @@ object Skills {
     fun power(job: Job, slot: Int, level: Int) = all.getValue(job)[slot].power * fraction(level)
     fun cooldown(job: Job, slot: Int, level: Int) = all.getValue(job)[slot].cooldown * (1 - .45 * progress(level))
     fun range(job: Job, slot: Int, level: Int) = all.getValue(job)[slot].range * (1 + .6 * progress(level))
+    fun arrowRadius(level: Int) = 6.0 * (1 + .6 * progress(level))
+    fun auraRadius(level: Int) = 22.0 * (1 + .6 * progress(level))
+    fun rangeDetail(job: Job, slot: Int, level: Int): String = when {
+        job==Job.WARRIOR && slot==2 -> "矢幅 %.1f / 射程 %.0f".format(java.util.Locale.ROOT,arrowRadius(level)*2,range(job,slot,level))
+        all.getValue(job)[slot].range>0 -> "${if(job==Job.SUMMONER && slot==1) "回復範囲" else "技範囲"} %.1f".format(java.util.Locale.ROOT,range(job,slot,level))
+        else -> "自分に効果 / 光と紋章も成長"
+    }
     fun detail(job: Job, slot: Int, level: Int): String {
         val skill = all.getValue(job)[slot]
         val powerText = if (skill.power > 0) "威力 ${power(job, slot, level).roundToInt()}   " else "効果 ${(fraction(level) * 100).roundToInt()}%   "
