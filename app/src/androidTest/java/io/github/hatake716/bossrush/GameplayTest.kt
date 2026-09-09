@@ -49,7 +49,11 @@ class GameplayTest {
     }
     private fun start(job: Job) {
         tap("はじめから  →"); tap("${job.label}を選択"); screenshot("job-${job.name}")
-        tap("この職業で出発  →"); screenshot("intro-${job.name}"); tap("戦闘開始  →")
+        tap("この職業で出発  →")
+        // First decoding of detailed scenery can outlast the menu's frame delay.
+        // Capture the presented encounter, rather than the preceding job selection.
+        assertNotNull(device.wait(Until.findObject(By.desc("戦闘開始  →")),5000))
+        SystemClock.sleep(100); screenshot("intro-${job.name}"); tap("戦闘開始  →")
         assertEquals(Screen.BATTLE,read { it.screen })
     }
     @Test fun fourJobsHaveUsableControlsAndBackgroundPause() {

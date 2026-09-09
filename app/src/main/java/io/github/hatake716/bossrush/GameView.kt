@@ -17,6 +17,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     var onContinue: (() -> Unit)?=null
     var onSoundChanged: ((Boolean) -> Unit)?=null
     private val art=PixelArt(context.assets)
+    private val backgrounds=BackgroundArt(context.assets)
     private val battleEffects=BattleEffects()
     private val p=Paint().apply { isAntiAlias=false }
     private val type=Paint().apply { isAntiAlias=true; typeface=Typeface.create("sans-serif",Typeface.NORMAL) }
@@ -147,24 +148,9 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         }
     }
     private fun landscape(c: Canvas,color: Boolean=false) {
+        backgrounds.landscape(c,color)
         val pal=if(color) Ink.dawn else Ink.palette
-        rect(c,0f,57f,960f,483f,pal[0])
-        for(i in 0..65) {
-            val x=(i*137%960).toFloat(); val y=(75+i*71%230).toFloat()
-            rect(c,x,y,if(i%8==0) 3f else 2f,2f,if(i%3==0) pal[2] else pal[1])
-        }
-        p.color=pal[2]; c.drawCircle(698f,161f,50f,p); p.color=pal[0]; c.drawCircle(680f,149f,46f,p)
-        for(i in 0..16) {
-            val h=(40+(i*47%80)).toFloat()
-            rect(c,i*64f,362-h,67f,h+85,pal[1]); rect(c,i*64f+16,348-h,34f,30f,pal[1])
-        }
-        for(i in 0..9) { rect(c,i*111f,413f+(i%3)*5,100f,4f,pal[2]); rect(c,i*111f+8,454f+(i%2)*18,85f,3f,pal[1]) }
-        art.tree(c,698f,422f,1.7f,color)
-        // Broken stone arch and its runes.
-        for(i in 0..6) { rect(c,516f,280f+i*19,21f,17f,pal[2]); rect(c,845f,280f+i*19,21f,17f,pal[2]) }
-        for(i in 0..5) { rect(c,532f+i*22,264f-i*7,22f,17f,pal[1]); rect(c,729f+i*22,229f+i*7,22f,17f,pal[1]) }
-        for(i in 0..8) rect(c,613f+i*19,464f,14f,3f,pal[2])
-        art.sprite(c,if(color) art.heroKey(engine.job) else "warrior",690f,442f,1.45f,color=color)
+        art.sprite(c,if(color) art.heroKey(engine.job) else "warrior",826f,473f,1.45f,color=color)
         for(i in 0..13) {
             val xx=(520+i*37%357).toFloat(); val yy=(300+(i*31+clock*9)%150).toFloat()
             rect(c,xx,yy,3f,3f,if(color && i%3==0) Color.rgb(230,164,111) else pal[2])
@@ -186,6 +172,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         button(c,"遊び方",48f,438f,123f,36f) { returnScreen=Screen.TITLE; engine.changeScreen(Screen.HELP) }
         button(c,"神話図鑑",185f,438f,123f,36f) { returnScreen=Screen.TITLE; engine.changeScreen(Screen.CODEX) }
         pixel(c,"BEST ${bestScore.toString().padStart(6,'0')}",48f,502f,1.65f,Ink.mid)
+        rect(c,638f,495f,288f,29f,Color.argb(215,16,29,26))
         pixel(c,"32 GODS / 4 HEROES / 1 DAWN",649f,505f,1.2f,Ink.mid)
     }
     private fun jobs(c: Canvas) {
@@ -214,7 +201,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         header(c,"THE NEXT ENCOUNTER")
         rect(c,36f,79f,355f,416f,Ink.deep); border(c,36f,79f,355f,416f)
         pixel(c,"ENCOUNTER ${(stage+1).toString().padStart(2,'0')} / 32",60f,103f,1.8f)
-        for(i in 0..5) border(c,80f+i*10,166f+i*10,260f-i*20,235f-i*20,Ink.mid,1f)
+        backgrounds.battle(c,b.id,38f,142f,351f,276f)
         art.boss(c,b.id,214f,405f,300f,270f)
         text(c,b.realm,214f,447f,19f,Ink.light,Paint.Align.CENTER)
         pixel(c,"${b.bpm} BPM",214f,467f,1.2f,Ink.mid,true)
@@ -242,11 +229,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         pixel(c,"${ceil(e.boss.hp/e.boss.maxHp*100).toInt()}%",543f,69f,1.35f)
         rect(c,28f,96f,600f,334f,Ink.deep); border(c,25f,93f,606f,340f)
         c.save(); c.translate(28f,96f); c.clipRect(0f,0f,600f,334f)
-        for(y in 0..10) for(x in 0..18) {
-            val xx=x*36f+(if(y%2==0) 0 else -18); val yy=y*32f
-            border(c,xx,yy,35f,31f,Ink.dark,1f)
-            if((x*7+y*11)%13==0) { rect(c,xx+5,yy+5,4f,2f,Ink.mid); rect(c,xx+9,yy+7,2f,5f,Ink.dark) }
-        }
+        backgrounds.battle(c,b.id)
         p.color=Ink.mid; p.style=Paint.Style.STROKE; p.strokeWidth=1f
         c.drawOval(80f,12f,520f,327f,p); c.drawOval(92f,20f,508f,319f,p); p.style=Paint.Style.FILL
         for(i in 0..7) {
@@ -534,7 +517,11 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         pixel(c,"SCORE ${r.score.toString().padStart(6,'0')}",58f,383f,2.4f,if(clear) Ink.dawn[3] else Ink.light)
         text(c,"${r.job.label}  /  ${r.kills}体撃破  /  %.1f秒  /  被ダメージ %.0f".format(java.util.Locale.ROOT,r.totalTime,r.totalDamage),58f,438f,13f,if(clear) Ink.dawn[2] else Ink.mid)
         button(c,"タイトルへ",40f,478f,215f,44f,true) { engine.changeScreen(Screen.TITLE) }
-        if(clear) { text(c,"THANK YOU FOR PLAYING",736f,486f,15f,Ink.dawn[3],Paint.Align.CENTER); text(c,"BOSSRUSH / ORIGINAL ART & MUSIC",736f,511f,11f,Ink.dawn[2],Paint.Align.CENTER) }
+        if(clear) {
+            rect(c,566f,474f,358f,49f,Color.argb(215,16,29,26))
+            text(c,"THANK YOU FOR PLAYING",736f,492f,15f,Ink.dawn[3],Paint.Align.CENTER)
+            text(c,"BOSSRUSH / ORIGINAL ART & MUSIC",736f,514f,11f,Ink.dawn[2],Paint.Align.CENTER)
+        }
         else button(c,"もう一度挑む",274f,478f,227f,44f) { engine.changeScreen(Screen.JOBS) }
     }
 
