@@ -65,7 +65,7 @@ class FeedbackRenderTest {
             }
             for(stage in listOf(0,3,10,12,17,23,29,30,31)) {
                 e.run!!.stage=stage; e.hazards.clear(); e.impacts.clear()
-                e.hazards.add(Hazard("circle",300.0,166.0,125.0,resolved=true,multiplier=1.65))
+                e.hazards.add(Hazard("circle",300.0,166.0,125.0,resolved=true,multiplier=1.65,ultimate=true))
                 e.impacts.add(BattleImpact(e.hazards.single(),.12))
                 val bitmap=render(); save(bitmap,"vfx-theme-${e.bossInfo.id}"); bitmap.recycle()
             }

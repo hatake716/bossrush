@@ -98,7 +98,7 @@ class BackgroundArtTest {
                     save(scene,"scene-${b.id}")
                     // Attack light may cover the outside; the safe interior must keep
                     // this boss's background, with no generic repaint of the floor.
-                    val hazard=Hazard("safe",300.0,230.0,62.0,resolved=true,multiplier=1.65)
+                    val hazard=Hazard("safe",300.0,230.0,62.0,resolved=true,multiplier=1.65,ultimate=true)
                     val before=ground.getPixel(300,230)
                     effects.impact(Canvas(ground),BattleImpact(hazard,.12),b.id)
                     assertEquals("${b.id} safe center remains visible",before,ground.getPixel(300,230))

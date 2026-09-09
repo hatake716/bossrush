@@ -73,7 +73,7 @@ class GameEngineTest {
         assertEquals(.0,e.damageDone,.01); tick(e,1.0)
         assertTrue(e.damageDone>=40.0); assertTrue(e.iceMarks.isEmpty())
     }
-    @Test fun ultimateTriggersAtOneThirdOnceAndPreventsSkipping() {
+    @Test fun firstUltimateTriggersAtOneThirdAndPreventsSkipping() {
         val e=battle(); e.damageBoss(e.boss.maxHp*2)
         assertEquals(Screen.CUTIN,e.screen); assertEquals(e.boss.maxHp/3,e.boss.hp,.001)
         val time=e.elapsed; tick(e,3.1); assertEquals(time,e.elapsed,.2); assertEquals(Screen.BATTLE,e.screen)

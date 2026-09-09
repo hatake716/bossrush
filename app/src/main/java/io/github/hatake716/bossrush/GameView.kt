@@ -255,7 +255,8 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             pixel(c,"LIMIT BREAK",450f,252f,1.4f,Ink.mid)
             text(c,b.ultimate,450f,294f,20f)
             wrap(c,b.hint,450f,325f,445f,14f)
-            text(c,"HPが残り1/3で発動。カットインの後に連続攻撃。",431f,390f,14f,Ink.mid)
+            text(c,"通常：${b.attackNames.joinToString(" / ")}",431f,386f,13f,Ink.mid)
+            text(c,"HP1/3で覚醒。その後は通常技と必殺技を使う。",431f,407f,12f,Ink.mid)
             text(c,"全回復して挑戦  /  アイテム ${engine.run!!.inventory.size}/5",431f,424f,15f)
             button(c,"戦闘開始  →",665f,454f,259f,51f,true) { engine.beginBattle() }
         }
@@ -272,7 +273,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         bar(c,225f,65f,307f+extra,16f,e.boss.hp,e.boss.maxHp)
         pixel(c,"${ceil(e.boss.hp/e.boss.maxHp*100).toInt()}%",543f+extra,69f,1.35f)
         backgrounds.battle(c,b.id,28f,96f,600f+extra,334f)
-        border(c,25f,93f,606f+extra,340f)
+        border(c,25f,93f,606f+extra,340f,if(e.ultimateActive) UltimateColors.forBoss(b.id).energy else Ink.mid)
         if(extra>0) {
             rect(c,28f,96f,extra/2,334f,Color.argb(80,16,29,26))
             rect(c,628f+extra/2,96f,extra/2,334f,Color.argb(80,16,29,26))
@@ -285,9 +286,9 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             pixel(c,"${i+1}",x.toFloat(),y.toFloat(),1.4f,Ink.mid,true)
         }
         e.impacts.forEach { battleEffects.impact(c,it,b.id) }
-        e.hazards.forEach { battleEffects.telegraph(c,it) }
+        e.hazards.forEach { battleEffects.telegraph(c,it,b.id) }
         e.hazards.firstOrNull { !it.resolved }?.let {
-            battleEffects.charge(c,e.boss.x,e.boss.y,it.time/it.delay,it.multiplier>1)
+            battleEffects.charge(c,e.boss.x,e.boss.y,it.time/it.delay,it.ultimate,b.id)
         }
         e.iceMarks.forEach { m ->
             p.style=Paint.Style.STROKE; p.strokeWidth=2f; p.color=Ink.light
@@ -332,8 +333,9 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         c.restore()
         // Cast information stays outside the playfield so it never hides a telegraph.
         if(e.castEnd>e.elapsed) {
-            text(c,e.castName,28f,455f,14f)
-            bar(c,28f,464f,241f,8f,e.castEnd-e.elapsed,1.75)
+            val color=if(e.ultimateActive) UltimateColors.forBoss(b.id).energy else Ink.light
+            text(c,e.castName,28f,455f,if(e.castName.length>19) 11f else 14f,color)
+            bar(c,28f,464f,241f,8f,e.castEnd-e.elapsed,1.85,color)
         } else pixel(c,"READ. DODGE. STRIKE.",28f,456f,1.3f,Ink.mid)
         text(c,if(e.messageTime>0) e.message else e.castHint,282f,455f,13f)
         // Floating thumb stick. Anywhere in the left half of the arena can be used.
@@ -386,18 +388,16 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     private fun cutin(c: Canvas) {
         scrim(c)
         val b=engine.bossInfo
-        rect(c,viewport.fullLeft,161f,viewport.fullWidth,190f,Ink.light)
-        for(i in 0..(viewport.width/33).toInt()) {
-            val drift=(engine.screenAge*260%80).toFloat()
-            rect(c,i*38f-drift,166f+i%5*36,54f+(i%3)*15,2f,Ink.mid)
-        }
-        border(c,viewport.fullLeft,158f,viewport.fullWidth,196f,Ink.mid,3f)
+        val colors=UltimateColors.forBoss(b.id)
+        battleEffects.cutin(c,b.id,viewport.fullLeft,161f,viewport.fullWidth,190f,engine.screenAge)
+        border(c,viewport.fullLeft,158f,viewport.fullWidth,196f,colors.energy,3f)
         shifted(c,extra/2) {
+            rect(c,364f,182f,565f,151f,Color.argb(228,17,12,33))
             art.boss(c,b.id,202f,340f,280f,172f)
-            pixel(c,"LIMIT BREAK",384f,192f,2.8f,Ink.deep)
-            text(c,b.ultimate,383f,269f,30f,Ink.dark)
-            text(c,b.name,385f,309f,18f,Ink.deep)
-            text(c,"残り1/3 ── 神々の真なる力",480f,119f,18f,Ink.light,Paint.Align.CENTER)
+            pixel(c,"LIMIT BREAK",384f,192f,2.8f,colors.energy)
+            text(c,b.ultimate,383f,269f,30f,colors.core)
+            text(c,b.name,385f,309f,18f,colors.accent)
+            text(c,if(engine.ultimateCount<=1) "残り1/3 ── 神々の真なる力" else "覚醒した神が、再び力を解き放つ",480f,119f,18f,colors.core,Paint.Align.CENTER)
             wrap(c,b.hint,170f,401f,620f,19f,Ink.light,30f)
             pixel(c,"READ THE SIGNS",480f,475f,1.7f,Ink.mid,true)
         }
