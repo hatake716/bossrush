@@ -17,6 +17,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     var onContinue: (() -> Unit)?=null
     var onSoundChanged: ((Boolean) -> Unit)?=null
     private val art=PixelArt()
+    private val battleEffects=BattleEffects()
     private val p=Paint().apply { isAntiAlias=false }
     private val type=Paint().apply { isAntiAlias=true; typeface=Typeface.create("sans-serif",Typeface.NORMAL) }
     private val buttons=mutableListOf<UiButton>()
@@ -24,6 +25,8 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     private var lastFrame=0L; private var running=false
     private var clock=0.0
     private var lastScreen=Screen.TITLE
+    private var windowChanged=false
+    private var accessibilityButtons=emptyList<Pair<String,Boolean>>()
     private var joystickId=-1; private var stickX=0f; private var stickY=0f
     private var skillPointer=-1
     private val keySet=mutableSetOf<Int>()
@@ -48,7 +51,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         engine.sounds.toList().forEach { audio.effect(it) }; engine.sounds.clear()
         if(lastScreen!=engine.screen) {
             lastScreen=engine.screen; resetInput(); contentDescription="BOSSRUSH ${screenName()}"
-            sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED)
+            windowChanged=true
         }
         invalidate()
         // Battle tracks display vsync. Menus leave idle time for Android lifecycle,
@@ -123,6 +126,19 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             Screen.ENDING -> result(canvas,true)
         }
         canvas.restore()
+        // Publish the virtual tree only AFTER its new buttons have been drawn. Reused
+        // node ids otherwise retain labels from the previous menu in accessibility caches.
+        val currentButtons=buttons.map { it.label to it.enabled }
+        if(windowChanged || currentButtons!=accessibilityButtons) {
+            accessibilityButtons=currentButtons; focusId=View.NO_ID; hoveredId=View.NO_ID
+            if(windowChanged) sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED)
+            windowChanged=false
+            if((context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager).isEnabled) {
+                val event=AccessibilityEvent.obtain(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED)
+                event.contentChangeTypes=AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE
+                sendAccessibilityEventUnchecked(event)
+            }
+        }
     }
     private fun landscape(c: Canvas,color: Boolean=false) {
         val pal=if(color) Ink.dawn else Ink.palette
@@ -231,7 +247,11 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             val a=i*PI/4; val x=300+cos(a)*215; val y=170+sin(a)*146
             pixel(c,"${i+1}",x.toFloat(),y.toFloat(),1.4f,Ink.mid,true)
         }
-        e.hazards.forEach { drawHazard(c,it) }
+        e.impacts.forEach { battleEffects.impact(c,it,b.id) }
+        e.hazards.forEach { battleEffects.telegraph(c,it) }
+        e.hazards.firstOrNull { !it.resolved }?.let {
+            battleEffects.charge(c,e.boss.x,e.boss.y,it.time/it.delay,it.multiplier>1)
+        }
         e.iceMarks.forEach { m ->
             p.style=Paint.Style.STROKE; p.strokeWidth=2f; p.color=Ink.light
             c.drawCircle(m.x.toFloat(),m.y.toFloat(),m.radius.toFloat(),p); p.style=Paint.Style.FILL
@@ -323,46 +343,16 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         text(c,"技は長押しで連続使用",795f,502f,12f,Ink.mid,Paint.Align.CENTER)
         text(c,"休むと2秒間移動できません",795f,523f,11f,Ink.mid,Paint.Align.CENTER)
     }
-    private fun drawHazard(c: Canvas,h: Hazard) {
-        val path=Path(); val x=h.x.toFloat(); val y=h.y.toFloat(); val a=h.a.toFloat(); val b=h.b.toFloat()
-        when(h.shape) {
-            "circle" -> path.addCircle(x,y,a,Path.Direction.CW)
-            "ring" -> { path.addRect(0f,0f,600f,334f,Path.Direction.CW); path.addCircle(x,y,a,Path.Direction.CCW) }
-            "safe", "tower" -> { path.addRect(0f,0f,600f,334f,Path.Direction.CW); path.addCircle(x,y,a,Path.Direction.CCW) }
-            "line" -> {
-                val dx=cos(h.angle).toFloat(); val dy=sin(h.angle).toFloat()
-                path.moveTo(x-dx*a/2+dy*b/2,y-dy*a/2-dx*b/2); path.lineTo(x+dx*a/2+dy*b/2,y+dy*a/2-dx*b/2)
-                path.lineTo(x+dx*a/2-dy*b/2,y+dy*a/2+dx*b/2); path.lineTo(x-dx*a/2-dy*b/2,y-dy*a/2+dx*b/2); path.close()
-            }
-            "cone" -> { path.moveTo(x,y); path.arcTo(x-a,y-a,x+a,y+a,((h.angle-h.b/2)*180/PI).toFloat(),(h.b*180/PI).toFloat(),false); path.close() }
-            "knock" -> {
-                p.style=Paint.Style.STROKE; p.strokeWidth=2f; p.color=Ink.light
-                for(i in 1..3) c.drawCircle(x,y,20f+i*22,p)
-                p.style=Paint.Style.FILL
-                pixel(c,"CENTER",x,y-8,1.5f,Ink.light,true); return
-            }
-        }
-        c.save(); c.clipPath(path)
-        p.color=if(h.resolved) Ink.light else Ink.dark; p.alpha=if(h.resolved) 175 else 100; c.drawPath(path,p); p.alpha=255
-        p.color=if(h.resolved) Ink.dark else Ink.mid; p.strokeWidth=2f
-        for(i in -340..600 step 14) c.drawLine(i.toFloat(),0f,i+340f,340f,p)
-        c.restore()
-        p.color=Ink.light; p.style=Paint.Style.STROKE; p.strokeWidth=2f; c.drawPath(path,p)
-        if(h.shape in listOf("circle","ring","safe","tower")) {
-            c.drawArc(x-a,y-a,x+a,y+a,-90f,(h.time/h.delay*360).coerceAtMost(360.0).toFloat(),false,p)
-        }
-        p.style=Paint.Style.FILL
-        if(h.shape=="safe"||h.shape=="tower") {
-            art.icon(c,if(h.shape=="tower") "boost" else "ghost",x-12,y-21,1.5f)
-            text(c,h.label,x,y+22,14f,Ink.light,Paint.Align.CENTER)
-        }
-    }
     private fun scrim(c: Canvas) { p.color=Ink.dark; p.alpha=225; c.drawRect(0f,57f,960f,540f,p); p.alpha=255; buttons.clear() }
     private fun cutin(c: Canvas) {
         scrim(c)
         val b=engine.bossInfo
         rect(c,0f,161f,960f,190f,Ink.light)
-        for(i in 0..22) rect(c,i*48f-20,166f+i%3*4,30f,2f,Ink.mid)
+        for(i in 0..28) {
+            val drift=(engine.screenAge*260%80).toFloat()
+            rect(c,i*38f-drift,166f+i%5*36,54f+(i%3)*15,2f,Ink.mid)
+        }
+        border(c,0f,158f,960f,196f,Ink.mid,3f)
         art.sprite(c,b.form,202f,337f,4.5f,engine.run!!.stage)
         pixel(c,"LIMIT BREAK",384f,192f,2.8f,Ink.deep)
         text(c,b.ultimate,383f,269f,30f,Ink.dark)
@@ -476,8 +466,8 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         text(c,b.ultimate,481f,270f,19f)
         wrap(c,b.hint,481f,302f,418f,15f)
         text(c,"♪ ${b.theme}",481f,378f,17f)
-        text(c,"${b.bpm} BPM  /  パルス波・三角波・ノイズ",481f,406f,13f,Ink.mid)
-        text(c,"戦闘と楽曲は神話をもとにした独自の創作です。",481f,443f,12f,Ink.mid)
+        text(c,"${b.bpm} BPM  /  ${BattleScore.themes[engine.selectedBoss].beats}拍子",481f,401f,13f,Ink.mid)
+        wrap(c,BattleScore.themes[engine.selectedBoss].character,481f,426f,418f,12f,Ink.light,18f)
         button(c,"←",36f,483f,62f,36f,enabled=codexPage>0) { codexPage--; engine.selectedBoss=codexPage*8 }
         pixel(c,"${codexPage+1} / 4",233f,496f,1.5f,Ink.mid,true)
         button(c,"→",364f,483f,62f,36f,enabled=codexPage<3) { codexPage++; engine.selectedBoss=codexPage*8 }

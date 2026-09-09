@@ -1,0 +1,119 @@
+package io.github.hatake716.bossrush
+
+import kotlin.math.*
+
+/** Authored phrases and instrumentation; all battle harmony uses bVI - bVII - i - i. */
+data class BattleTheme(
+    val id: String, val character: String, val voice: String, val rhythm: String,
+    val phraseA: List<Int>, val phraseB: List<Int>, val register: Int = 0,
+    val beats: Int = 4
+)
+
+object BattleScore {
+    private fun theme(id: String, character: String, voice: String, rhythm: String, a: String, b: String, register: Int=0, beats: Int=4) =
+        BattleTheme(id,character,voice,rhythm,a.split(' ').map(String::toInt),b.split(' ').map(String::toInt),register,beats)
+    val themes = listOf(
+        theme("ratatoskr","枝を跳ぶ高音と、伝言を返す短い応答","spark","1110111011101111","0 4 1 5 2 6 4 2 1 5 2 6 4 7 6 4","7 4 6 2 5 1 4 0 2 5 3 6 4 2 1 0",12),
+        theme("dainn","枝葉を揺らす角笛と、四本の蹄の拍動","horn","1010101110101011","0 2 4 6 4 2 1 2 3 5 7 5 4 2 3 1","4 6 7 9 7 6 4 2 5 4 3 2 1 3 2 0"),
+        theme("gullinbursti","金毛の輝く上昇句と、猪の突進ベース","spark","1110101111101011","0 4 7 6 4 7 9 7 2 6 9 8 6 4 2 4","7 9 11 9 7 6 4 6 5 7 9 7 4 2 1 0"),
+        theme("hugin","問い掛ける鴉の跳躍と、鋭い返答","raven","1011011010110110","0 6 1 5 2 7 3 6 1 5 0 4 2 6 3 1","7 2 6 1 5 0 4 2 6 3 7 4 5 2 1 0"),
+        theme("munin","記憶の旋律を一拍遅れで追う二声","echo","1010101010111010","4 2 1 0 2 4 6 4 3 1 0 2 4 6 7 4","7 6 4 2 4 6 4 1 5 3 1 0 2 4 2 0"),
+        theme("tanngrisnir","雷車の蹄を刻む二連打と低い角笛","thunder","1110111011101110","0 0 4 2 0 4 6 2 1 1 5 3 1 5 7 3","4 4 7 6 4 2 0 2 5 5 7 5 3 2 1 0"),
+        theme("skoll","太陽へ駆け上がる音列と追跡の連打","hunt","1111111011111110","0 1 2 4 5 6 7 9 7 6 4 2 4 5 6 7","7 8 9 11 9 7 6 4 6 7 9 7 6 4 2 0"),
+        theme("hati","月へ回り込む下降句と裏拍の追走","hunt","1011111010111110","7 6 5 4 2 1 0 2 6 5 4 2 1 0 2 4","9 7 6 4 2 4 6 7 5 4 2 1 3 2 1 0"),
+        theme("hraesvelgr","羽ばたく長い旋律と、北風のノイズ","wind","1010101110101010","0 4 7 9 7 6 4 2 1 5 8 10 8 6 5 3","7 9 11 9 7 4 2 0 6 7 9 7 5 4 2 0"),
+        theme("thjazi","急降下する翼と、奪われた春の高音","wind","1110101011101110","7 6 4 2 0 2 4 7 8 7 5 3 1 3 5 8","9 7 4 0 2 4 6 7 10 8 5 1 3 5 3 0"),
+        theme("skadi","氷の短音と、矢のような高音の跳躍","ice","1011101010111010","7 4 6 2 5 1 4 0 2 5 7 6 4 2 3 1","9 6 8 4 7 3 6 2 4 7 9 7 5 3 1 0"),
+        theme("ullr","弦を弾く短い音と、誓いを告げる上昇句","pluck","1010111010101110","0 2 4 7 6 4 2 1 2 4 6 9 7 6 4 2","4 7 9 11 9 7 4 2 6 9 7 6 4 3 1 0"),
+        theme("aegir","荒波の上下運動と、宴の三連アクセント","sea","1101101101101110","0 2 4 6 7 6 4 2 1 3 5 7 8 7 5 3","4 6 7 9 7 6 4 2 5 7 8 10 8 5 3 0"),
+        theme("ran","絡みつく二声の網と、沈む低音","sea","1011010110110101","4 1 5 2 6 3 7 4 3 0 4 1 5 2 3 0","7 4 8 5 9 6 7 3 6 2 5 1 4 0 2 0"),
+        theme("njord","帆を押す上昇音と、航路を刻む低音","wind","1010111011101010","0 2 4 5 7 6 4 2 1 3 5 6 8 7 5 3","4 5 7 9 11 9 7 5 6 8 10 8 6 4 2 0"),
+        theme("jormungandr","尾に戻る循環旋律と、世界を締める低音","serpent","1110110111101101","0 1 2 4 6 4 2 1 0 2 3 5 6 5 3 2","7 6 4 2 1 2 4 6 7 5 3 1 0 1 3 5"),
+        theme("garmr","番犬の吠える低音と鎖を叩く裏拍","hunt","1110101110111010","0 0 2 1 0 4 3 1 0 0 5 3 2 1 4 2","4 4 7 6 4 2 1 0 5 5 8 6 3 2 1 0"),
+        theme("hel","高音と低音を交互に鳴らす二つの顔","dual","1010101011101010","0 2 4 5 4 2 1 0 7 6 4 3 4 6 7 6","7 9 11 12 11 9 7 6 0 1 3 4 3 1 2 0"),
+        theme("nidhogg","根を齧る断続音と下へ崩れる音列","serpent","1101011011010110","0 1 4 3 2 1 0 -1 4 3 2 1 0 -1 1 0","7 6 4 3 2 1 0 1 5 4 3 2 1 0 -1 0"),
+        theme("fenrir","鎖を断つ休符明けの強打と獣の連打","hunt","1110111111101111","0 2 0 4 3 2 0 6 4 2 4 7 6 4 2 0","7 9 7 11 9 7 6 4 6 4 6 9 7 4 2 0"),
+        theme("hrungnir","石心の三打アクセントと砥石の低音","stone","1101101111011011","0 2 4 0 2 4 1 3 5 1 3 5 2 1 0 2","4 6 7 4 6 7 5 7 9 5 7 9 4 2 1 0"),
+        theme("thrym","霜の婚礼を刻む重い行進と凍る残響","stone","1011101010111011","0 0 2 4 3 2 1 0 1 1 3 5 4 3 2 1","4 4 6 7 6 4 2 0 5 5 7 8 7 5 3 0"),
+        theme("utgardloki","音色を入れ替える幻術とずれる拍頭","trick","1101011010110101","0 4 1 6 2 7 3 5 1 5 2 7 0 6 4 1","7 3 6 2 5 1 4 0 8 4 7 3 6 2 1 0"),
+        theme("surtr","炎剣が駆け上がる音列と燃え続ける連打","fire","1111111111101111","0 2 4 6 7 9 7 6 4 6 7 9 11 9 7 4","7 9 11 13 14 11 9 7 6 4 6 7 9 7 4 0"),
+        theme("idunn","芽吹く高音の装飾と、林檎を守る切迫感","spark","1010111010111010","0 2 4 7 6 4 5 2 1 3 5 8 7 5 6 3","7 9 11 9 7 6 4 5 8 10 12 10 8 6 4 0"),
+        theme("freyr","鹿角の上昇句と自ら踊る剣の分散和音","pluck","1110101110111011","0 2 4 6 7 4 6 9 7 6 4 2 5 4 2 0","4 6 7 9 11 7 9 12 11 9 7 5 6 4 2 0"),
+        theme("freyja","黄金の装飾音と、セイズの呪文の応答","echo","1011101110101110","0 2 4 6 7 6 4 3 2 4 6 7 9 7 6 4","7 6 9 7 11 9 7 6 5 7 9 8 6 4 3 0"),
+        theme("tyr","誓いの行進、片腕を表す一拍の空白","horn","1010101010101110","0 4 3 2 0 2 3 4 1 5 4 3 1 3 4 5","7 6 4 2 0 2 4 7 5 4 3 1 0 1 2 0"),
+        theme("heimdall","終末を告げる角笛の五度と虹橋の上昇","horn","1011101011101110","0 4 7 7 6 4 2 0 2 6 9 9 7 6 4 2","7 11 14 14 12 11 9 7 5 9 12 11 9 7 4 0"),
+        theme("loki","三拍子の顔を変える二拍アクセント","trick","101101101011","0 1 4 2 5 3 6 4 7 5 2 6 3 1 4 0","7 3 6 2 5 1 4 0 8 4 7 3 6 2 5 0",0,3),
+        theme("thor","鎚の四分連打、二重キックと雷鳴の下降","thunder","1110111111101111","0 0 4 6 4 2 0 2 1 1 5 7 5 3 1 3","7 7 11 9 7 6 4 0 8 8 12 10 8 6 4 0"),
+        theme("odin","槍の鋭い主旋律と、二羽の鴉の応答","raven","1110101110111110","0 4 6 7 9 7 4 2 1 5 7 8 10 8 5 3","7 11 9 7 6 4 2 0 5 9 7 5 4 2 1 0")
+    )
+    private val minor = intArrayOf(0,2,3,5,7,8,10)
+    fun chordAt(bar: Int): List<Int> = when(Math.floorMod(bar,4)) {
+        0 -> listOf(8,12,15) // bVI major
+        1 -> listOf(10,14,17) // bVII major
+        else -> listOf(0,3,7) // i minor (two bars)
+    }
+    private fun degree(n: Int) = Math.floorDiv(n,7)*12+minor[Math.floorMod(n,7)]
+    private data class Step(val lead: Double,val arp: Double,val bass: Double,val counter: Double,val on: Boolean,val kick: Double,val snare: Double)
+    private data class Arrangement(val theme: BattleTheme,val duration: Double,val steps: List<Step>) {
+        val gate=if(theme.voice in listOf("ice","pluck","spark")) .73 else .91
+        val counter=theme.voice in listOf("echo","raven","dual")
+    }
+    private val scores by lazy {
+        themes.mapIndexed { index,t ->
+            check(t.id==Bosses.all[index].id)
+            val root=Bosses.all[index].root
+            val melodyRoot=root+if(root<58) 12 else 0
+            val count=t.beats*4
+            val steps=(0 until count*16).map { s ->
+                val bar=s/count; val beat=s%count; val section=bar/4
+                val phrase=if(section%2==0) t.phraseA else t.phraseB
+                val motif=phrase[(s/2)%phrase.size]
+                var note=degree(motif)+t.register
+                val chord=chordAt(bar)
+                // Strong melody beats resolve into the CURRENT chord, not a parallel minor chord.
+                if(beat%4==0) note=(-24..48).filter { Math.floorMod(it,12) in chord.map { n -> n%12 } }.minBy { abs(it-note) }
+                if(section==2) note+=12
+                if(t.voice=="dual" && bar%2==1) note-=12
+                val flourish=if(beat%2==1 && t.rhythm[beat%t.rhythm.length]=='1') 2 else 0
+                val arpOrder=if(t.voice=="sea") intArrayOf(0,1,2,1) else intArrayOf(0,2,1,2)
+                val arp=chord[arpOrder[beat%4]]+if(beat%8>=4) 12 else 0
+                val bass=chord[0]+if(beat%4==2) 12 else 0
+                val previous=degree(phrase[Math.floorMod(s/2-2,phrase.size)])
+                val kick=when { beat%4==0 -> 1.0; t.voice in listOf("thunder","hunt","fire") && beat%4==2 -> .72; t.voice=="stone" && beat%3==0 -> .9; else -> .0 }
+                val snare=if((t.beats==3 && beat==8) || (t.beats==4 && beat%8==4)) 1.0 else if(bar%4==3 && beat>=count-3) .7 else .0
+                Step(hz(melodyRoot+note+flourish),hz(root-12+arp),hz(root-24+bass),hz(melodyRoot+previous-12),t.rhythm[beat%t.rhythm.length]=='1',kick,snare)
+            }
+            Arrangement(t,60.0/Bosses.all[index].bpm/4,steps)
+        }
+    }
+    private val arpDuty=.25
+    private fun hz(note: Int)=440*2.0.pow((note-69)/12.0)
+    fun sample(time: Double,index: Int): Double {
+        val a=scores[index.coerceIn(0,31)]; val step=(time/a.duration).toLong(); val s=a.steps[(step%a.steps.size).toInt()]
+        val local=time%a.duration; val phase=local/a.duration; val voice=a.theme.voice
+        val gate=a.gate
+        val env=if(phase>gate) .0 else min(1.0,local/.003)*min(1.0,(gate-phase)/.12)
+        val duty=when(voice) { "horn","thunder","stone" -> .5; "spark","ice","raven" -> .125; "trick" -> if(step/12%2==0L) .125 else .5; else -> .25 }
+        val lead=if(s.on) AudioMath.pulse(time,s.lead*(1+.002*sin(time*34)),duty)*env*.23 else .0
+        val arp=AudioMath.pulse(time,s.arp,arpDuty)*env*.10
+        val bass=AudioMath.triangle(time,s.bass)*min(1.0,local/.002)*(1-phase*.65)*.22
+        val counter=if(a.counter || step/(a.theme.beats*4)%16>=8) AudioMath.pulse(time,s.counter,.25)*env*.065 else .0
+        val noise=AudioMath.noise(time)
+        val kick=sin(2*PI*(53*local+2.8*(1-exp(-local*55))))*exp(-local*27)*s.kick*.31
+        val snare=(noise*.73+sin(2*PI*175*local)*.27)*exp(-local*42)*s.snare*.25
+        val hat=noise*exp(-local*190)*(if(step%2==0L) .065 else .10)
+        val crash=if(step%(a.theme.beats*16)==0L) noise*exp(-local*17)*.12 else .0
+        val breath=if(voice=="wind" || voice=="fire") noise*env*.022 else .0
+        return (lead+arp+bass+counter+kick+snare+hat+crash+breath)*min(1.0,time*25)
+    }
+}
+
+internal object AudioMath {
+    fun pulse(t: Double,f: Double,duty: Double)=if((t*f)%1<duty) 1.0-duty else -duty
+    fun triangle(t: Double,f: Double)=1-4*abs((t*f)%1-.5)
+    fun noise(time: Double): Double {
+        var n=(time*22050).toLong()+0x9e3779b9L
+        n=(n xor (n shr 16))*0x45d9f3bL; n=(n xor (n shr 16))*0x45d9f3bL
+        return ((n xor (n shr 16)) and 65535)/32768.0-1
+    }
+}

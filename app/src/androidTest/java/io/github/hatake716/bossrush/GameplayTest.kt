@@ -63,7 +63,12 @@ class GameplayTest {
                 assertEquals(-1,read { it.selectedItem })
             }
             val skills=Skills.all.getValue(job)
-            for(i in 0..3) assertNotNull(device.findObject(By.desc("技${i+1} ${skills[i].name}")))
+            for(i in 0..3) {
+                val label="技${i+1} ${skills[i].name}"
+                val node=device.wait(Until.findObject(By.desc(label)),3000)
+                if(node==null) screenshot("missing-${job.name}-skill-$i")
+                assertNotNull("Missing $label for $job in ${read { it.screen }}",node)
+            }
             val x=read { it.player.x }
             gesture(1.0,.0,if(job==Job.SUMMONER) 0 else 2,700)
             assertTrue(read { it.player.x }>x+25)

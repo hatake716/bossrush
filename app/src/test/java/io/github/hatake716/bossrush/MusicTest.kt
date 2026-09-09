@@ -21,16 +21,54 @@ class MusicTest {
         }
         assertEquals(32,signatures.size)
     }
+    @Test fun zunHarmonyHasMajorSixAndSevenThenMinorTonicInEverySection() {
+        for(bar in 0 until 16) {
+            val chord=BattleScore.chordAt(bar)
+            assertEquals(if(bar%4<2) 4 else 3,chord[1]-chord[0])
+            assertEquals(7,chord[2]-chord[0])
+            assertEquals(listOf(8,10,0,0)[bar%4],chord[0])
+        }
+        assertTrue(Bosses.all.all { it.bpm in 192..232 })
+        assertEquals(Bosses.all.map { it.id },BattleScore.themes.map { it.id })
+        assertEquals(32,BattleScore.themes.map { it.phraseA to it.phraseB }.toSet().size)
+        assertEquals(3,BattleScore.themes.first { it.id=="loki" }.beats)
+        for(theme in BattleScore.themes) {
+            assertEquals(16,theme.phraseA.size); assertEquals(16,theme.phraseB.size)
+            assertEquals(theme.beats*4,theme.rhythm.length)
+        }
+    }
+    @Test fun fullArrangementsAndLoopBoundariesStayFiniteWithHeadroom() {
+        for(index in 0..31) {
+            val duration=60.0/Bosses.all[index].bpm*BattleScore.themes[index].beats*16
+            for(frame in 0..(duration*22050).toInt() step 31) {
+                val value=ScoreSynth.sample(frame/22050.0,"battle",index)
+                assertTrue(value.isFinite()); assertTrue(abs(value)<1.0)
+            }
+            for(offset in listOf(-.00001,.0,.00001)) {
+                assertTrue(ScoreSynth.sample(duration+offset,"battle",index).isFinite())
+            }
+        }
+    }
     @Test fun exportOriginalMusicPreviews() {
         val dir=File("../artifacts/music"); dir.mkdirs()
-        for((name,scene,index) in listOf(Triple("01-ratatoskr","battle",0),Triple("31-thor","battle",30),Triple("32-odin","battle",31),Triple("ending","ending",31))) {
-            val length=ScoreSynth.SAMPLE_RATE*12
+        for((name,scene,index) in listOf(Triple("01-ratatoskr","battle",0),Triple("13-aegir","battle",12),Triple("18-hel","battle",17),Triple("30-loki","battle",29),Triple("31-thor","battle",30),Triple("32-odin","battle",31),Triple("ending","ending",31))) {
+            val length=ScoreSynth.SAMPLE_RATE*24
             val data=ByteBuffer.allocate(44+length*2).order(ByteOrder.LITTLE_ENDIAN)
             data.put("RIFF".toByteArray()).putInt(36+length*2).put("WAVEfmt ".toByteArray()).putInt(16).putShort(1).putShort(1)
                 .putInt(ScoreSynth.SAMPLE_RATE).putInt(ScoreSynth.SAMPLE_RATE*2).putShort(2).putShort(16).put("data".toByteArray()).putInt(length*2)
             repeat(length) { data.putShort((ScoreSynth.sample(it.toDouble()/ScoreSynth.SAMPLE_RATE,scene,index)*18000).toInt().toShort()) }
             File(dir,"$name.wav").writeBytes(data.array())
             assertEquals((44+length*2).toLong(),File(dir,"$name.wav").length())
+        }
+        val names=listOf("sword","knife","arrow","fire","ice","giant-hit","haniwa")
+        for(name in names) {
+            val clip=SoundEffects.clip(name)!!
+            val length=clip.size
+            val data=ByteBuffer.allocate(44+length*2).order(ByteOrder.LITTLE_ENDIAN)
+            data.put("RIFF".toByteArray()).putInt(36+length*2).put("WAVEfmt ".toByteArray()).putInt(16).putShort(1).putShort(1)
+                .putInt(ScoreSynth.SAMPLE_RATE).putInt(ScoreSynth.SAMPLE_RATE*2).putShort(2).putShort(16).put("data".toByteArray()).putInt(length*2)
+            clip.forEach { data.putShort((it*22000).toInt().toShort()) }
+            File(dir,"se-$name.wav").writeBytes(data.array())
         }
     }
 }

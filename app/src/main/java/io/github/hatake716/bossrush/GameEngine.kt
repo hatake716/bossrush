@@ -55,6 +55,7 @@ class GameEngine {
     val projectiles = mutableListOf<Projectile>()
     val iceMarks = mutableListOf<IceMark>()
     val hazards = mutableListOf<Hazard>()
+    val impacts = mutableListOf<BattleImpact>()
     val particles = mutableListOf<Particle>()
     val cues = mutableListOf<Cue>()
     val sounds = mutableListOf<String>()
@@ -109,7 +110,7 @@ class GameEngine {
         player=Actor(300.0,265.0,job.hp,job.hp)
         boss=Actor(300.0,125.0,1e12,1e12)
         gauge=100.0; cooldowns.fill(0.0); buffs.clear(); summons.clear(); projectiles.clear(); iceMarks.clear()
-        hazards.clear(); particles.clear(); cues.clear(); sounds.clear()
+        hazards.clear(); impacts.clear(); particles.clear(); cues.clear(); sounds.clear()
         elapsed=0.0; damageTaken=0.0; damageDone=0.0; restTime=0.0; invulnerability=0.0
         ultimateUsed=false; cutinTime=0.0; patternNumber=0; nextPattern=1.6
         message="予兆の外へ移動。技を押して攻撃！"; messageTime=4.0
@@ -168,31 +169,31 @@ class GameEngine {
         player.facing=atan2(boss.y-player.y,boss.x-player.x)
         when(job) {
             Job.WARRIOR -> when(slot) {
-                0 -> { damageBoss(power(0)); slash("SLASH") }
-                1 -> { buffs["shield"]=4.0+4*Skills.progress(levels[1]); sounds.add("buff") }
+                0 -> { damageBoss(power(0)); slash("SLASH","sword") }
+                1 -> { buffs["shield"]=4.0+4*Skills.progress(levels[1]); sounds.add("shield") }
                 2 -> shoot(power(2),6.0,"arrow",370.0)
             }
             Job.MAGE -> when(slot) {
                 0 -> shoot(power(0),range,"fire",290.0)
                 1 -> { iceMarks.add(IceMark(boss.x,boss.y,power(1),range)); sounds.add("ice") }
-                2 -> { buffs["focus"]=5.0+4*Skills.progress(levels[2]); sounds.add("buff") }
+                2 -> { buffs["focus"]=5.0+4*Skills.progress(levels[2]); sounds.add("focus") }
             }
-            Job.SUMMONER -> if(haniwa) { damageBoss(power(2)); slash("HANIWA") } else {
+            Job.SUMMONER -> if(haniwa) { damageBoss(power(2)); slash("HANIWA","haniwa") } else {
                 summons.add(Summon(slot,player.x+(if(summons.isEmpty()) -27 else 27),player.y-20,12.0+8*Skills.progress(levels[slot])))
-                sounds.add("summon")
+                sounds.add(when(slot) { 0 -> "summon-giant"; 1 -> "summon-rabbit"; else -> "summon-haniwa" })
             }
             Job.THIEF -> when(slot) {
-                0 -> { damageBoss(power(0)); slash("SLASH") }
+                0 -> { damageBoss(power(0)); slash("SLASH","knife") }
                 1 -> {
                     val item=Item.entries.filter { it.special }[(run!!.stage + levels[1]-1)%4]
                     run!!.inventory.add(item); stolen=true; notify("${item.title}を盗んだ！"); sounds.add("coin")
                 }
-                2 -> { buffs["speed"]=5.0+4*Skills.progress(levels[2]); sounds.add("buff") }
+                2 -> { buffs["speed"]=5.0+4*Skills.progress(levels[2]); sounds.add("speed") }
             }
         }
         return true
     }
-    private fun slash(text: String) { if(!trial) { particles.add(Particle((player.x+boss.x)/2,(player.y+boss.y)/2,text,.22)); sounds.add("hit") } }
+    private fun slash(text: String,sound: String) { if(!trial) { particles.add(Particle((player.x+boss.x)/2,(player.y+boss.y)/2,text,.22)); sounds.add(sound) } }
     private fun shoot(power: Double, radius: Double, kind: String, speed: Double) {
         val a=atan2(boss.y-player.y,boss.x-player.x)
         projectiles.add(Projectile(player.x,player.y,cos(a)*speed,sin(a)*speed,power,radius,kind))
@@ -205,7 +206,7 @@ class GameEngine {
         if(!trial && applied>0) particles.add(Particle(boss.x+sin(elapsed*7)*25,boss.y-30,"${applied.roundToInt()}"))
         if(trial) return
         if(!ultimateUsed && boss.hp<=boss.maxHp/3+.001) {
-            ultimateUsed=true; hazards.clear(); cues.clear(); changeScreen(Screen.CUTIN); cutinTime=3.0; sounds.add("ultimate")
+            ultimateUsed=true; hazards.clear(); impacts.clear(); cues.clear(); changeScreen(Screen.CUTIN); cutinTime=3.0; sounds.add("ultimate")
         } else if(boss.hp<=0.0) victory()
     }
     fun heal(value: Double) {
@@ -268,6 +269,7 @@ class GameEngine {
             return
         }
         if(screen!=Screen.BATTLE) return
+        impacts.forEach { it.age+=dt }; impacts.removeAll { it.age>=it.lifetime }
         elapsed+=dt; messageTime=max(0.0,messageTime-dt); invulnerability=max(0.0,invulnerability-dt)
         for(i in cooldowns.indices) cooldowns[i]=max(0.0,cooldowns[i]-dt)
         buffs.keys.toList().forEach { buffs[it]=max(0.0,buffs.getValue(it)-dt) }
@@ -295,7 +297,10 @@ class GameEngine {
             s.x+=(tx-s.x)*min(1.0,dt*6); s.y+=(ty-s.y)*min(1.0,dt*6)
             if(s.timer<=0) {
                 s.timer+=if(s.kind==1) 2.0 else 1.0
-                if(s.kind==0 && hypot(s.x-boss.x,s.y-boss.y)<Skills.range(job,0,levels[0])+25) damageBoss(power(0))
+                if(s.kind==0 && hypot(s.x-boss.x,s.y-boss.y)<Skills.range(job,0,levels[0])+25) {
+                    damageBoss(power(0))
+                    if(!trial) { sounds.add("giant-hit"); particles.add(Particle(boss.x,boss.y,"HANIWA",.22)) }
+                }
                 if(s.kind==1) heal(Skills.power(job,1,levels[1]))
             }
         }
@@ -305,7 +310,7 @@ class GameEngine {
             p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt
             if(hypot(p.x-boss.x,p.y-boss.y)<28+p.radius*.3) {
                 damageBoss(p.power); p.life=0.0
-                if(!trial) particles.add(Particle(p.x,p.y,if(p.kind=="fire") "BURST" else "HIT",.25))
+                if(!trial) { particles.add(Particle(p.x,p.y,if(p.kind=="fire") "BURST" else "HIT",.25)); sounds.add("${p.kind}-hit") }
             }
         }
         projectiles.removeAll { it.life<=0 }
@@ -314,7 +319,7 @@ class GameEngine {
             mark.time-=dt
             if(mark.time<=0) {
                 if(hypot(mark.x-boss.x,mark.y-boss.y)<mark.radius+25) damageBoss(mark.power)
-                if(!trial) particles.add(Particle(mark.x,mark.y,"ICE",.3))
+                if(!trial) { particles.add(Particle(mark.x,mark.y,"ICE",.3)); sounds.add("ice-hit") }
             }
         }
         iceMarks.removeAll { it.time<=0 }
@@ -343,6 +348,8 @@ class GameEngine {
             h.time+=dt
             if(!h.resolved && h.time>=h.delay) {
                 h.resolved=true
+                if(impacts.size>=24) impacts.removeAt(0)
+                impacts.add(BattleImpact(h.copy()))
                 if(h.contains(player.x,player.y)) {
                     if(h.shape=="knock") {
                         val angle=atan2(player.y-h.y,player.x-h.x)
