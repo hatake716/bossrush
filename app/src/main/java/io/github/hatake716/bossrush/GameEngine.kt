@@ -225,8 +225,16 @@ class GameEngine(random: Random=Random.Default) {
     private fun startUltimate() {
         ultimateUsed=true; ultimateCount++; director.ultimateStarted()
         hazards.clear(); impacts.clear(); cues.clear(); normalCues.clear()
-        changeScreen(Screen.CUTIN); cutinTime=if(ultimateCount==1) 3.0 else 1.6
         castName=bossInfo.ultimate; castHint=bossInfo.hint; sounds.add("ultimate")
+        if(ultimateCount==1) {
+            changeScreen(Screen.CUTIN); cutinTime=3.0
+        } else beginUltimateSequence()
+    }
+    private fun beginUltimateSequence() {
+        // Repeated ultimates keep combat, movement and held attacks running.
+        bossInfo.sequence.forEachIndexed { i,p -> cues.add(Cue(elapsed+i*2.2,p,i)) }
+        nextPattern=elapsed+bossInfo.sequence.size*2.2+1.3
+        castHint=bossInfo.hint
     }
     fun heal(value: Double) {
         val actual=min(player.maxHp-player.hp,value); player.hp+=actual
@@ -282,9 +290,7 @@ class GameEngine(random: Random=Random.Default) {
             if(cutinTime<=0) {
                 cutinTime=0.0
                 changeScreen(Screen.BATTLE)
-                bossInfo.sequence.forEachIndexed { i,p -> cues.add(Cue(elapsed+i*2.2,p,i)) }
-                nextPattern=elapsed+bossInfo.sequence.size*2.2+1.3
-                castHint=bossInfo.hint
+                beginUltimateSequence()
             }
             return
         }

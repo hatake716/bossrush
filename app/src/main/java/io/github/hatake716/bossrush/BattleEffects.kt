@@ -228,7 +228,7 @@ class BattleEffects {
         val colors=UltimateColors.forBoss(bossId)
         p.style=Paint.Style.FILL; p.alpha=255
         p.shader=LinearGradient(left,top,left+width,top+height,
-            intArrayOf(colors.shadow,colors.energy,colors.accent,colors.shadow),floatArrayOf(0f,.28f,.76f,1f),Shader.TileMode.CLAMP)
+            intArrayOf(colors.cutinEdge,colors.energy,colors.energy,colors.cutinEdge),floatArrayOf(0f,.25f,.65f,1f),Shader.TileMode.CLAMP)
         c.drawRect(left,top,left+width,top+height,p); p.shader=null
         c.save(); c.clipRect(left,top,left+width,top+height)
         val cx=left+width*.31f; val cy=top+height*.52f

@@ -1,7 +1,12 @@
 package io.github.hatake716.bossrush
 
 /** Attack energy briefly regains color; the world itself stays colorless until the ending. */
-data class CombatPalette(val energy: Int,val accent: Int,val core: Int=0xfffff4df.toInt(),val shadow: Int=0xff130f2d.toInt())
+data class CombatPalette(val energy: Int,val accent: Int,val core: Int=0xfffff4df.toInt(),val shadow: Int=0xff130f2d.toInt()) {
+    // The backdrop takes its hue from the same primary energy as attack effects.
+    val cutinEdge: Int get() = 0xff000000.toInt() or
+        (((energy shr 16 and 255)*.22).toInt() shl 16) or
+        (((energy shr 8 and 255)*.22).toInt() shl 8) or ((energy and 255)*.22).toInt()
+}
 object UltimateColors {
     private val pairs=listOf(
         "ratatoskr" to (0xff79fa57 to 0xffffb33d), "dainn" to (0xffaaff68 to 0xff38dab0),

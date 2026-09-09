@@ -53,7 +53,8 @@ class FeedbackRenderTest {
                 assertTrue("$pattern must visibly erupt",countDiff(warning,impact)>80)
                 assertEquals(damageBefore,e.damageTaken,.0) // Drawing is never damage.
                 val px=(ox+(28+e.player.x)*scale).toInt(); val py=(oy+(96+e.player.y)*scale).toInt()
-                assertEquals("Player foot marker is drawn over every effect",Ink.light,impact.getPixel(px,py))
+                if(impact.getPixel(px,py)!=Ink.light) save(impact,"vfx-foot-failure")
+                assertEquals("$pattern foot ($px,$py) player=${e.player} sampled=($ox,$oy,$scale) actual=${view.viewport} size=${view.width}x${view.height}",Ink.light,impact.getPixel(px,py))
                 if(pattern==Pattern.ECLIPSE || pattern==Pattern.TOWERS) {
                     val h=e.hazards.single()
                     val safeX=(ox+(28+h.x)*scale).toInt(); val safeY=(oy+(96+h.y)*scale).toInt()

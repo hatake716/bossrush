@@ -57,15 +57,21 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     private var accessibilityButtons=emptyList<Pair<String,Boolean>>()
     private var joystickId=-1; private var stickX=0f; private var stickY=0f
     private var skillPointer=-1
-    private val keySet=mutableSetOf<Int>()
+    private var touchSkill=-1
+    internal val controller=GameController(this)
+    internal fun controllerButtons(): List<UiButton> = buttons
     private var pressed: String?=null
     private var codexPage=0
     private var portraitExpanded=false
     private var returnScreen=Screen.TITLE
+    private var controllerHelp=false
     private var focusId=View.NO_ID
     private var hoveredId=View.NO_ID
     init {
         isFocusable=true; isFocusableInTouchMode=true; importantForAccessibility=IMPORTANT_FOR_ACCESSIBILITY_YES
+        // Canvas draws its own per-button selection. Android's default focus
+        // highlight otherwise washes out the entire game after gamepad input.
+        defaultFocusHighlightEnabled=false
         contentDescription="BOSSRUSH タイトル"
         ViewCompat.setOnApplyWindowInsetsListener(this) { _,insets ->
             val safe=insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.displayCutout())
@@ -74,6 +80,12 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         }
     }
     fun resume() { if(!running) { running=true; lastFrame=0; audio.start(); Choreographer.getInstance().postFrameCallback(this) } }
+    override fun onAttachedToWindow() { super.onAttachedToWindow(); controller.attach(); requestFocus() }
+    override fun onDetachedFromWindow() { controller.detach(); super.onDetachedFromWindow() }
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        if(!hasWindowFocus) { resetInput(); controller.focusLost() }
+    }
     fun suspend() { running=false; engine.pause(); resetInput(); audio.stop(); Choreographer.getInstance().removeFrameCallback(this) }
     override fun doFrame(frameTimeNanos: Long) {
         if(!running) return
@@ -87,6 +99,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             lastScreen=engine.screen; resetInput(); contentDescription="BOSSRUSH ${screenName()}"
             windowChanged=true
         }
+        controller.tick()
         invalidate()
         // Battle tracks display vsync. Menus leave idle time for Android lifecycle,
         // accessibility and input dispatch, and need far fewer redraws.
@@ -99,7 +112,16 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         Screen.REWARD -> "ボス撃破 技の成長"; Screen.SHOP -> "ショップ"; Screen.PAUSED -> "一時停止"
         Screen.GAMEOVER -> "ゲームオーバー"; Screen.ENDING -> "ゲームクリア"; Screen.CODEX -> "神話図鑑"; Screen.HELP -> "遊び方"
     }
-    private fun resetInput() { joystickId=-1; skillPointer=-1; pressed=null; stickX=0f; stickY=0f; engine.moveX=.0; engine.moveY=.0; engine.heldSkill=-1; keySet.clear() }
+    private fun resetInput() {
+        joystickId=-1; skillPointer=-1; touchSkill=-1; pressed=null; stickX=0f; stickY=0f
+        controller.reset()
+    }
+    internal fun refreshControls() {
+        val movement=controller.movement
+        engine.moveX=if(joystickId>=0) stickX.toDouble() else movement.x.toDouble()
+        engine.moveY=if(joystickId>=0) stickY.toDouble() else movement.y.toDouble()
+        engine.heldSkill=if(touchSkill>=0) touchSkill else controller.heldSkill
+    }
     fun goBack() {
         if(portraitExpanded) { portraitExpanded=false; invalidate(); return }
         when(engine.screen) {
@@ -144,7 +166,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         shifted(c,0f,headerTop) {
             rect(c,viewport.fullLeft,0f,viewport.fullWidth,57f,Ink.dark); rect(c,24f,55f,912f+extra,1f,Ink.mid)
             art.icon(c,"sword",28f,16f,1.6f); pixel(c,"BOSSRUSH",64f,19f,2.4f)
-            pixel(c,section,300f,22f,1.5f,Ink.mid)
+            pixel(c,if(controller.active && engine.screen !in listOf(Screen.BATTLE,Screen.CUTIN)) "A:OK / B:BACK" else section,300f,22f,1.5f,Ink.mid)
             button(c,if(audio.enabled) "♪ ON" else "♪ OFF",803f+extra,12f,66f,31f) { audio.enabled=!audio.enabled; onSoundChanged?.invoke(audio.enabled) }
             if(back) button(c,"戻る",880f+extra,12f,57f,31f) { goBack() }
         }
@@ -172,6 +194,11 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             Screen.HELP -> help(canvas)
             Screen.GAMEOVER -> result(canvas,false)
             Screen.ENDING -> result(canvas,true)
+        }
+        if(controller.active && engine.screen !in listOf(Screen.BATTLE,Screen.CUTIN)) controller.focused()?.let { b ->
+            val r=b.rect
+            border(canvas,r.left-4,r.top-4,r.width()+8,r.height()+8,Ink.light,2f)
+            rect(canvas,r.left-7,r.centerY()-4,5f,8f,Ink.light)
         }
         canvas.restore()
         // Publish the virtual tree only AFTER its new buttons have been drawn. Reused
@@ -206,8 +233,8 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         text(c,"神々を越えて、色を取り戻せ。",48f,313f,20f)
         text(c,"4つの職業。32の試練。ひとつの夜明け。",49f,344f,14f,Ink.mid)
         button(c,"はじめから  →",48f,372f,212f,49f,true) {
-            if(hasSave) AlertDialog.Builder(context).setTitle("新しい冒険を始めますか？").setMessage("職業を選んで出発すると、今の冒険の保存データが置き換わります。最高スコアは残ります。")
-                .setPositiveButton("職業を選ぶ") { _,_ -> engine.changeScreen(Screen.JOBS) }.setNegativeButton("戻る",null).show()
+            if(hasSave) controller.prepareDialog(AlertDialog.Builder(context).setTitle("新しい冒険を始めますか？").setMessage("職業を選んで出発すると、今の冒険の保存データが置き換わります。最高スコアは残ります。")
+                .setPositiveButton("職業を選ぶ") { _,_ -> engine.changeScreen(Screen.JOBS) }.setNegativeButton("戻る",null).show())
             else engine.changeScreen(Screen.JOBS)
         }
         button(c,"つづきから",274f,372f,173f,49f,enabled=hasSave) { onContinue?.invoke() }
@@ -362,7 +389,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
                 val held=e.heldSkill==i
                 rect(c,x,y,138f,77f,if(held) Ink.light else Ink.deep); border(c,x,y,138f,77f,if(ready) Ink.light else Ink.mid)
                 art.icon(c,s.glyph,x+11,y+12,1.7f,if(held) Ink.dark else Ink.light)
-                pixel(c,"LV${e.levels[i]}",x+92,y+11,1.2f,if(held) Ink.dark else Ink.mid)
+                pixel(c,"${if(controller.active) listOf("A","B","X","Y")[i]+" / " else ""}LV${e.levels[i]}",x+(if(controller.active) 54 else 92),y+11,1.2f,if(held) Ink.dark else Ink.mid)
                 text(c,if(e.job==Job.SUMMONER&&i==2&&e.summons.any { it.kind==2 }) "はにわで殴る" else s.name,x+69,y+58,if(s.name.length>7) 13f else 15f,if(held) Ink.dark else Ink.light,Paint.Align.CENTER)
                 if(!ready && e.cooldowns[i]>0) {
                     rect(c,x+3,y+68,(132*e.cooldowns[i]/Skills.cooldown(e.job,i,e.levels[i])).toFloat(),5f,Ink.mid)
@@ -376,13 +403,14 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             val x=116f+i*(99+extra/4)
             rect(c,x,484f,89f,41f,Ink.deep); border(c,x,484f,89f,41f,Ink.mid,1f)
             if(i<r.inventory.size) {
+                if(controller.active && i==controller.item) border(c,x-2,482f,93f,45f,Ink.light,2f)
                 val item=r.inventory[i]; art.icon(c,item.icon,x+7,491f,1.6f)
                 text(c,item.title.take(3),x+40,508f,12f)
                 buttons.add(UiButton("アイテム${i+1} ${item.title}",RectF(x,484f,x+89,525f)) { e.selectedItem=i; e.pause() })
             } else text(c,"—",x+45,509f,14f,Ink.mid,Paint.Align.CENTER)
         }
-        text(c,"技は長押しで連続使用",795f+extra,502f,12f,Ink.mid,Paint.Align.CENTER)
-        text(c,"休むと2秒間移動できません",795f+extra,523f,11f,Ink.mid,Paint.Align.CENTER)
+        text(c,if(controller.active) "L1 / R1 選択・L2 アイテム" else "技は長押しで連続使用",795f+extra,502f,12f,Ink.mid,Paint.Align.CENTER)
+        text(c,if(controller.active) "START 一時停止・技は長押し可" else "休むと2秒間移動できません",795f+extra,523f,11f,Ink.mid,Paint.Align.CENTER)
     }
     private fun scrim(c: Canvas) { fullRect(c,Color.argb(225,16,29,26)); buttons.clear() }
     private fun cutin(c: Canvas) {
@@ -397,7 +425,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             pixel(c,"LIMIT BREAK",384f,192f,2.8f,colors.energy)
             text(c,b.ultimate,383f,269f,30f,colors.core)
             text(c,b.name,385f,309f,18f,colors.accent)
-            text(c,if(engine.ultimateCount<=1) "残り1/3 ── 神々の真なる力" else "覚醒した神が、再び力を解き放つ",480f,119f,18f,colors.core,Paint.Align.CENTER)
+            text(c,"残り1/3 ── 神々の真なる力",480f,119f,18f,colors.core,Paint.Align.CENTER)
             wrap(c,b.hint,170f,401f,620f,19f,Ink.light,30f)
             pixel(c,"READ THE SIGNS",480f,475f,1.7f,Ink.mid,true)
         }
@@ -480,8 +508,8 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             val x=36f+i*(179+extra/4)
             val item=r.inventory.getOrNull(i)
             if(item!=null) button(c,item.title,x,410f,168f,44f) {
-                AlertDialog.Builder(context).setTitle(item.title).setMessage("${item.description}\n\nこのアイテムを手放して、かばんに空きを作りますか？")
-                    .setPositiveButton("手放す") { _,_ -> e.discardItem(i) }.setNegativeButton("戻る",null).show()
+                controller.prepareDialog(AlertDialog.Builder(context).setTitle(item.title).setMessage("${item.description}\n\nこのアイテムを手放して、かばんに空きを作りますか？")
+                    .setPositiveButton("手放す") { _,_ -> e.discardItem(i) }.setNegativeButton("戻る",null).show())
             } else { border(c,x,410f,168f,44f,Ink.deep); text(c,"空き",x+84,438f,13f,Ink.mid,Paint.Align.CENTER) }
         }
         text(c,"${if(e.messageTime>0) e.message else "ボス戦ごとにHPとゲージは全回復。ここで自動保存されます。"}",36f,499f,13f,Ink.mid)
@@ -550,7 +578,15 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     private fun help(c: Canvas) {
         header(c,"HOW TO PLAY")
         pixel(c,"READ. DODGE. STRIKE.",36f,83f,2.8f)
-        val topics=listOf(
+        button(c,if(controllerHelp) "基本の遊び方" else "コントローラー操作",692f+extra,74f,232f,39f) { controllerHelp=!controllerHelp }
+        val topics=if(controllerHelp) listOf(
+            "01  接続と移動" to "AndroidにBluetoothまたはUSBで接続して操作。左スティック／十字キーで移動します。スティックは倒し具合で速度が変わります。",
+            "02  4つの技" to "A＝技1、B＝技2、X＝技3、Y＝技4。押し続けると連続使用。ボタンの配置は機種で異なるので、戦闘画面のA・B・X・Y表示を確認しましょう。",
+            "03  アイテム" to "L1／R1でかばんの選択枠を移動。L2で時間を止めて効果を確認。Aで使用、Bでキャンセルします。何度も押しても一度に1個だけ使います。",
+            "04  メニューと一時停止" to "左スティック／十字キーで白い選択枠を移動、Aで決定、Bで戻ります。STARTで一時停止／再開。職業選択や買い物も同じ操作です。",
+            "05  ボタン表記" to "A／B／X／YはAndroidの標準ボタン名です。L1・R1は上側の肩ボタン、L2は左トリガー。確認ダイアログ内の選択には十字キーを使います。",
+            "06  安心して再開" to "操作中のコントローラーが切断されると戦闘を一時停止します。再接続してSTARTで再開。タッチ操作にもいつでも切り替えられます。"
+        ) else listOf(
             "01  移動と攻撃" to "戦場の左半分をドラッグして移動。右の技をタップ、長押しで連続使用。攻撃は自動でボスの方向を狙います。足元の丸が当たり判定です。",
             "02  予兆を読む" to "斜線が危険地帯。輪の内側は安全です。月印と白いルーンの円は中へ入りましょう。吹き飛ばしは中央へ。前後攻撃は切り返します。",
             "03  技と召喚" to "技にはゲージと待機時間が必要。召喚士は回復速度が半分で仲間は2体まで。はにわは正面を守り、再タップすると近接攻撃します。",
@@ -590,11 +626,12 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         val x=(event.getX(index)-ox)/scale; val y=(event.getY(index)-oy)/scale
         when(event.actionMasked) {
             MotionEvent.ACTION_DOWN,MotionEvent.ACTION_POINTER_DOWN -> {
+                controller.touch()
                 val b=buttons.lastOrNull { it.rect.contains(x,y) }
                 if(b!=null) {
                     if(b.enabled) {
                         pressed=b.label
-                        if(b.skill>=0 && engine.screen==Screen.BATTLE) { skillPointer=id; engine.heldSkill=b.skill; b.action() }
+                        if(b.skill>=0 && engine.screen==Screen.BATTLE) { skillPointer=id; touchSkill=b.skill; refreshControls(); b.action() }
                     }
                 } else if(engine.screen==Screen.BATTLE && x>=0 && x<640+extra && y in 95f..433f && joystickId<0) {
                     joystickId=id
@@ -610,8 +647,8 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
                 return true
             }
             MotionEvent.ACTION_UP,MotionEvent.ACTION_POINTER_UP -> {
-                if(id==joystickId) { joystickId=-1; stickX=0f; stickY=0f; engine.moveX=.0; engine.moveY=.0 }
-                else if(id==skillPointer) { skillPointer=-1; engine.heldSkill=-1; pressed=null }
+                if(id==joystickId) { joystickId=-1; stickX=0f; stickY=0f; refreshControls() }
+                else if(id==skillPointer) { skillPointer=-1; touchSkill=-1; refreshControls(); pressed=null }
                 else {
                     val b=buttons.lastOrNull { it.rect.contains(x,y) && it.label==pressed }
                     if(b?.enabled==true) { b.action(); audio.effect("click"); performClick() }
@@ -627,27 +664,12 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     private fun updateStick(x: Float,y: Float) {
         val dx=(x-joystickOriginX)/37; val dy=(y-joystickOriginY)/37
         val len=hypot(dx,dy).coerceAtLeast(1f); stickX=dx/len; stickY=dy/len
-        engine.moveX=stickX.toDouble(); engine.moveY=stickY.toDouble()
+        refreshControls()
     }
     override fun performClick(): Boolean { super.performClick(); return true }
-    override fun onKeyDown(keyCode: Int,event: KeyEvent): Boolean {
-        if(keyCode==KeyEvent.KEYCODE_ESCAPE) { if(event.repeatCount==0) goBack(); return true }
-        if(keyCode in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_4 && engine.screen==Screen.BATTLE) {
-            engine.heldSkill=keyCode-KeyEvent.KEYCODE_1; engine.useSkill(engine.heldSkill); return true
-        }
-        if(keyCode in movementKeys) { keySet.add(keyCode); updateKeyboard(); return true }
-        return super.onKeyDown(keyCode,event)
-    }
-    override fun onKeyUp(keyCode: Int,event: KeyEvent): Boolean {
-        if(keyCode in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_4) { engine.heldSkill=-1; return true }
-        if(keyCode in movementKeys) { keySet.remove(keyCode); updateKeyboard(); return true }
-        return super.onKeyUp(keyCode,event)
-    }
-    private val movementKeys=setOf(KeyEvent.KEYCODE_W,KeyEvent.KEYCODE_A,KeyEvent.KEYCODE_S,KeyEvent.KEYCODE_D,KeyEvent.KEYCODE_DPAD_LEFT,KeyEvent.KEYCODE_DPAD_RIGHT,KeyEvent.KEYCODE_DPAD_UP,KeyEvent.KEYCODE_DPAD_DOWN)
-    private fun updateKeyboard() {
-        engine.moveX=(if(keySet.any { it==KeyEvent.KEYCODE_D || it==KeyEvent.KEYCODE_DPAD_RIGHT }) 1.0 else .0)-(if(keySet.any { it==KeyEvent.KEYCODE_A || it==KeyEvent.KEYCODE_DPAD_LEFT }) 1.0 else .0)
-        engine.moveY=(if(keySet.any { it==KeyEvent.KEYCODE_S || it==KeyEvent.KEYCODE_DPAD_DOWN }) 1.0 else .0)-(if(keySet.any { it==KeyEvent.KEYCODE_W || it==KeyEvent.KEYCODE_DPAD_UP }) 1.0 else .0)
-    }
+    override fun onKeyDown(keyCode: Int,event: KeyEvent): Boolean = controller.key(keyCode,event) || super.onKeyDown(keyCode,event)
+    override fun onKeyUp(keyCode: Int,event: KeyEvent): Boolean = controller.key(keyCode,event) || super.onKeyUp(keyCode,event)
+    override fun onGenericMotionEvent(event: MotionEvent): Boolean = controller.motion(event) || super.onGenericMotionEvent(event)
     // Canvas controls expose real virtual accessibility nodes for TalkBack, keyboards and UI tests.
     override fun getAccessibilityNodeProvider(): AccessibilityNodeProvider = object: AccessibilityNodeProvider() {
         override fun createAccessibilityNodeInfo(id: Int): AccessibilityNodeInfo? {

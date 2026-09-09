@@ -72,7 +72,7 @@ class BossCombatTest {
             else assertTrue(fresh.single().contains(e.player.x,e.player.y))
         }
     }
-    @Test fun awakeningCancelsPendingNormalsAndPauseFreezesTheRepeatCutin() {
+    @Test fun awakeningCancelsPendingNormalsAndEachNewBattleGetsOneCutin() {
         val e=arena(31); e.castNormal(0,0); assertTrue(e.normalCues.isNotEmpty())
         e.damageBoss(900.0)
         assertEquals(300.0,e.boss.hp,.001); assertEquals(Screen.CUTIN,e.screen)
@@ -83,6 +83,8 @@ class BossCombatTest {
         assertTrue(e.hazards.all { it.ultimate }); assertTrue(e.ultimateActive)
         val count=e.ultimateCount; e.beginBattle()
         assertTrue(count>0); assertEquals(0,e.ultimateCount); assertFalse(e.ultimateUsed); assertTrue(e.normalCues.isEmpty())
+        e.damageBoss(e.boss.maxHp)
+        assertEquals(Screen.CUTIN,e.screen); assertEquals(1,e.ultimateCount); assertEquals(3.0,e.cutinTime,.0)
     }
     @Test fun fullEncountersMixRepeatedUltimatesWithNormalsWithoutOverlappingSequences() {
         fun fight(seed: Int): List<String> {
@@ -95,12 +97,18 @@ class BossCombatTest {
                 e.update(.05)
                 if(e.ultimateCount>lastUlt) {
                     assertTrue(e.hazards.isEmpty()); assertTrue(e.normalCues.isEmpty())
-                    assertEquals(Screen.CUTIN,e.screen)
+                    assertEquals(if(e.ultimateCount==1) Screen.CUTIN else Screen.BATTLE,e.screen)
                     events.add("ULT"); lastUlt=e.ultimateCount
                     if(lastUlt>1) {
-                        val time=e.elapsed; val cutin=e.cutinTime
+                        assertEquals(.0,e.cutinTime,.0); assertTrue(e.cues.isNotEmpty())
+                        e.moveX=1.0; e.player.x=100.0; e.heldSkill=2; e.cooldowns[2]=999.0
+                        val time=e.elapsed; val x=e.player.x
+                        e.update(.02)
+                        assertTrue(e.elapsed>time); assertTrue(e.player.x>x); assertEquals(2,e.heldSkill)
+                        e.moveX=.0; e.heldSkill=-1
+                        val pauseTime=e.elapsed
                         e.pause(); repeat(4) { e.update(.05) }; e.unpause()
-                        assertEquals(time,e.elapsed,.0); assertEquals(cutin,e.cutinTime,.0)
+                        assertEquals(pauseTime,e.elapsed,.0); assertEquals(Screen.BATTLE,e.screen)
                     }
                 }
                 if(e.castName!=lastName) {
