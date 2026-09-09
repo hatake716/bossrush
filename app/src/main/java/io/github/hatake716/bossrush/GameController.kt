@@ -136,13 +136,14 @@ internal class GameController(private val view: GameView): InputManager.InputDev
         val flat=max(device?.getMotionRange(MotionEvent.AXIS_X,event.source)?.flat ?: 0f,
             device?.getMotionRange(MotionEvent.AXIS_Y,event.source)?.flat ?: 0f)
         axis=ControllerMath.stick(event.getAxisValue(MotionEvent.AXIS_X),event.getAxisValue(MotionEvent.AXIS_Y),flat)
-        hat=ControllerMath.direction(event.getAxisValue(MotionEvent.AXIS_HAT_X),event.getAxisValue(MotionEvent.AXIS_HAT_Y))
+        fun hatAxis(id: Int): Float = event.getAxisValue(id).let { if(abs(it)>.5f) sign(it) else 0f }
+        hat=ControllerMath.Point(hatAxis(MotionEvent.AXIS_HAT_X),hatAxis(MotionEvent.AXIS_HAT_Y))
         val trigger=max(event.getAxisValue(MotionEvent.AXIS_LTRIGGER),event.getAxisValue(MotionEvent.AXIS_BRAKE))
         if(trigger>.55f && !triggerDown) { openItem(); triggerDown=true }
         else if(trigger<.35f && KeyEvent.KEYCODE_BUTTON_L2 !in down) triggerDown=false
         if(e.screen==Screen.BATTLE) view.refreshControls()
         else {
-            val direction=if(hat.x!=0f || hat.y!=0f) hat else ControllerMath.direction(axis.x,axis.y)
+            val direction=if(hat.x!=0f || hat.y!=0f) ControllerMath.direction(hat.x,hat.y) else ControllerMath.direction(axis.x,axis.y)
             if(direction!=nav) {
                 nav=direction
                 if(nav.x!=0f || nav.y!=0f) navigate(nav.x,nav.y)
