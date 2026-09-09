@@ -49,29 +49,21 @@ class MusicTest {
             }
         }
     }
-    @Test fun titleOvertureHasDistinctSectionsAndCleanFullLoopHeadroom() {
-        assertEquals(144,TitleScore.BPM)
-        val signatures=mutableSetOf<Long>()
-        var maximum=.0
-        for(section in 0..7) {
-            var energy=.0; var hash=7L
-            for(frame in 0 until (TitleScore.SECONDS/8*22050).toInt() step 3) {
-                val t=section*TitleScore.SECONDS/8+frame/22050.0
-                val v=ScoreSynth.sample(t,"title",0)
-                assertTrue(v.isFinite()); maximum=max(maximum,abs(v)); energy+=v*v
-                hash=hash*31+(v*30000).roundToInt()
-                assertEquals(v,ScoreSynth.sample(t,"title",31),.0)
-            }
-            assertTrue(energy>50); signatures.add(hash)
+    @Test fun titleIsSilentWhileOtherScenesAndEffectsRemainAudible() {
+        for(index in 0..31) for(frame in 0..60000 step 17) {
+            assertEquals(0.0,ScoreSynth.sample(frame/1000.0,"title",index),0.0)
         }
-        assertEquals(8,signatures.size); assertTrue(maximum in .25..0.75)
-        for(i in -10..10) assertTrue(abs(TitleScore.sample(TitleScore.SECONDS+i/22050.0))<.75)
-        assertNotEquals(ScoreSynth.sample(.123,"shop",0),ScoreSynth.sample(.123,"title",0))
+        for(scene in listOf("battle","shop","ending")) {
+            var energy=0.0
+            repeat(22050) { val sample=ScoreSynth.sample(it/22050.0,scene,0); energy+=sample*sample }
+            assertTrue("$scene must remain audible",energy>1.0)
+        }
+        assertTrue(SoundEffects.clip("sword")!!.any { abs(it)>.01 })
     }
     @Test fun exportOriginalMusicPreviews() {
         val dir=File("../artifacts/music"); dir.mkdirs()
-        for((name,scene,index) in listOf(Triple("title-overture","title",0),Triple("01-ratatoskr","battle",0),Triple("13-aegir","battle",12),Triple("18-hel","battle",17),Triple("30-loki","battle",29),Triple("31-thor","battle",30),Triple("32-odin","battle",31),Triple("ending","ending",31))) {
-            val length=(ScoreSynth.SAMPLE_RATE*(if(scene=="title") TitleScore.SECONDS else 24.0)).toInt()
+        for((name,scene,index) in listOf(Triple("01-ratatoskr","battle",0),Triple("13-aegir","battle",12),Triple("18-hel","battle",17),Triple("30-loki","battle",29),Triple("31-thor","battle",30),Triple("32-odin","battle",31),Triple("ending","ending",31))) {
+            val length=ScoreSynth.SAMPLE_RATE*24
             val data=ByteBuffer.allocate(44+length*2).order(ByteOrder.LITTLE_ENDIAN)
             data.put("RIFF".toByteArray()).putInt(36+length*2).put("WAVEfmt ".toByteArray()).putInt(16).putShort(1).putShort(1)
                 .putInt(ScoreSynth.SAMPLE_RATE).putInt(ScoreSynth.SAMPLE_RATE*2).putShort(2).putShort(16).put("data".toByteArray()).putInt(length*2)

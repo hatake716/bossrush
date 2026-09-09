@@ -17,7 +17,7 @@ object ScoreSynth {
     private val minorArp=intArrayOf(0,3,7,12)
     fun sample(time: Double, scene: String, bossIndex: Int): Double {
         if(scene=="battle") return BattleScore.sample(time,bossIndex)
-        if(scene=="title") return TitleScore.sample(time)
+        if(scene=="title") return 0.0
         val end=scene=="ending"
         val bpm=if(end) 78 else if(scene=="shop") 112 else 92
         val stepDuration=60.0/bpm/2
