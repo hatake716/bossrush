@@ -73,9 +73,9 @@ class GameEngineTest {
         assertEquals(.0,e.damageDone,.01); tick(e,1.0)
         assertTrue(e.damageDone>=40.0); assertTrue(e.iceMarks.isEmpty())
     }
-    @Test fun firstUltimateTriggersAtOneThirdAndPreventsSkipping() {
+    @Test fun firstUltimateTriggersAtHalfAndPreventsSkipping() {
         val e=battle(); e.damageBoss(e.boss.maxHp*2)
-        assertEquals(Screen.CUTIN,e.screen); assertEquals(e.boss.maxHp/3,e.boss.hp,.001)
+        assertEquals(Screen.CUTIN,e.screen); assertEquals(e.boss.maxHp/2,e.boss.hp,.001)
         val time=e.elapsed; tick(e,3.1); assertEquals(time,e.elapsed,.2); assertEquals(Screen.BATTLE,e.screen)
         assertTrue(e.ultimateUsed); assertTrue(e.hazards.isNotEmpty()||e.cues.isNotEmpty())
         e.damageBoss(e.boss.maxHp); assertEquals(Screen.REWARD,e.screen)
@@ -194,13 +194,13 @@ class GameEngineTest {
             val delay=e.hazards.minOf { it.delay }; val first=e.hazards.filter { abs(it.delay-delay)<.01 }
             var best=Double.POSITIVE_INFINITY
             for(x in 20..580 step 10) for(y in 20..310 step 10) if(first.none { it.contains(x.toDouble(),y.toDouble(),12.0) }) best=min(best,hypot(x-e.player.x,y-e.player.y))
-            assertTrue("${pattern.name} $pos needs $best distance in $delay",best/e.job.speed+.39<=delay)
+            assertTrue("${pattern.name} $pos needs $best distance in $delay",best/e.job.speed+.19<=delay)
         }
     }
     @Test fun extendedUltimateTelegraphsDoNotOverlapLaterSteps() {
         val e=battle(Job.SUMMONER,29); e.player.x=20.0; e.player.y=20.0
         e.damageBoss(e.boss.maxHp); tick(e,3.1)
         val remaining=e.hazards.maxOf { it.delay-it.time }
-        assertTrue(e.cues.first().at>=e.elapsed+remaining+.5)
+        assertTrue(e.cues.first().at>=e.elapsed+remaining+.25)
     }
 }

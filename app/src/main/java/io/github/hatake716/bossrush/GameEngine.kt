@@ -19,7 +19,7 @@ data class IceMark(var x: Double, var y: Double, val power: Double, val radius: 
 data class Particle(var x: Double, var y: Double, val text: String, var life: Double = .85, val good: Boolean = false)
 data class Hazard(
     val shape: String, var x: Double, var y: Double, val a: Double, val b: Double = 0.0,
-    val angle: Double = 0.0, var delay: Double = 1.4, val duration: Double = .28,
+    val angle: Double = 0.0, var delay: Double = 1.4, val duration: Double = .28*BossTiming.SCALE,
     val multiplier: Double = 1.0, var time: Double = 0.0, var resolved: Boolean = false,
     val sourceX: Double = x, val sourceY: Double = y, val label: String = "",
     val ultimate: Boolean = false
@@ -80,12 +80,14 @@ class GameEngine(random: Random=Random.Default) {
     var ultimateCount = 0
         private set
     val ultimateActive get()=cutinTime>0 || cues.isNotEmpty() || hazards.any { it.ultimate && !it.resolved } || impacts.any { it.hazard.ultimate }
+    val enraged get() = ultimateUsed && boss.hp > 0 && boss.hp <= boss.maxHp*.25
     var cutinTime = 0.0
     var patternNumber = 0
-    var nextPattern = 1.5
+    var nextPattern = 1.5*BossTiming.SCALE
     var castName = ""
     var castHint = "斜線の予兆から離れよう"
     var castEnd = 0.0
+    var castDuration = 0.0
     var message = ""
     var messageTime = 0.0
     var lastScore = 0
@@ -125,10 +127,10 @@ class GameEngine(random: Random=Random.Default) {
         gauge=100.0; cooldowns.fill(0.0); buffs.clear(); summons.clear(); projectiles.clear(); iceMarks.clear()
         hazards.clear(); impacts.clear(); particles.clear(); cues.clear(); normalCues.clear(); sounds.clear(); director.reset()
         elapsed=0.0; damageTaken=0.0; damageDone=0.0; restTime=0.0; invulnerability=0.0
-        ultimateUsed=false; ultimateCount=0; cutinTime=0.0; patternNumber=0; nextPattern=1.6
+        ultimateUsed=false; ultimateCount=0; cutinTime=0.0; patternNumber=0; nextPattern=1.6*BossTiming.SCALE
         message="予兆の外へ移動。技を押して攻撃！"; messageTime=4.0
         rewardChosen=false; lootChosen=false; stolen=false; pendingLoot=null; fortune=false
-        castName=""; castEnd=0.0; selectedItem=-1
+        castName=""; castEnd=0.0; castDuration=0.0; selectedItem=-1
         if (!reference) {
             val hp = max(estimateHp(r), r.previousHp * 1.025).roundToInt().toDouble()
             boss.hp=hp; boss.maxHp=hp
@@ -214,11 +216,13 @@ class GameEngine(random: Random=Random.Default) {
     }
     fun damageBoss(amount: Double) {
         if(screen!=Screen.BATTLE) return
-        val applied=if(!trial && !ultimateUsed && boss.hp-amount<=boss.maxHp/3) max(0.0,boss.hp-boss.maxHp/3) else min(boss.hp,amount)
+        val applied=if(!trial && !ultimateUsed && boss.hp-amount<=boss.maxHp/2) max(0.0,boss.hp-boss.maxHp/2) else min(boss.hp,amount)
+        val wasEnraged=enraged
         boss.hp=max(0.0,boss.hp-applied); damageDone+=applied
+        if(!trial && !wasEnraged && enraged) notify("HP1/4：二重詠唱！ 重なる予兆の隙間へ")
         if(!trial && applied>0) particles.add(Particle(boss.x+sin(elapsed*7)*25,boss.y-30,"${applied.roundToInt()}"))
         if(trial) return
-        if(!ultimateUsed && boss.hp<=boss.maxHp/3+.001) {
+        if(!ultimateUsed && boss.hp<=boss.maxHp/2+.001) {
             startUltimate()
         } else if(boss.hp<=0.0) victory()
     }
@@ -232,8 +236,8 @@ class GameEngine(random: Random=Random.Default) {
     }
     private fun beginUltimateSequence() {
         // Repeated ultimates keep combat, movement and held attacks running.
-        bossInfo.sequence.forEachIndexed { i,p -> cues.add(Cue(elapsed+i*2.2,p,i)) }
-        nextPattern=elapsed+bossInfo.sequence.size*2.2+1.3
+        bossInfo.sequence.forEachIndexed { i,p -> cues.add(Cue(elapsed+i*2.2*BossTiming.SCALE,p,i)) }
+        nextPattern=elapsed+(bossInfo.sequence.size*2.2+1.3)*BossTiming.SCALE
         castHint=bossInfo.hint
     }
     fun heal(value: Double) {
@@ -357,12 +361,12 @@ class GameEngine(random: Random=Random.Default) {
         cues.removeAll(due.toSet())
         due.forEach {
             cast(it.pattern,true,it.ordinal)
-            val finish=elapsed+(hazards.maxOfOrNull { h -> h.delay-h.time } ?: .0)+.55
+            val finish=elapsed+(hazards.maxOfOrNull { h -> h.delay-h.time } ?: .0)+.55*BossTiming.SCALE
             if(cues.isNotEmpty() && cues.first().at<finish) {
                 val shift=finish-cues.first().at
                 cues.forEach { cue -> cue.at+=shift }
             }
-            nextPattern=max(nextPattern,(cues.lastOrNull()?.at ?: elapsed)+(finish-elapsed)+.8)
+            nextPattern=max(nextPattern,(cues.lastOrNull()?.at ?: elapsed)+(finish-elapsed)+.8*BossTiming.SCALE)
         }
         val normalDue=normalCues.filter { it.at<=elapsed }
         normalCues.removeAll(normalDue.toSet())
@@ -400,26 +404,74 @@ class GameEngine(random: Random=Random.Default) {
         val difficulty=BossDifficulty(run!!.stage)
         val arena=NormalArena(this,cue.memoryX,cue.memoryY,cue.ordinal)
         attack.draw(arena,cue.wave)
+        val partner=if(enraged) combineNormal(arena.hazards,cue.slot,cue.ordinal+cue.wave) else null
         ensureReachable(arena.hazards,difficulty.reaction)
         hazards.addAll(arena.hazards)
         castName=bossInfo.attackNames[cue.slot]+if(attack.waves>1) "  ${cue.wave+1}/${attack.waves}" else ""
-        castHint=attack.hint
-        castEnd=elapsed+arena.hazards.maxOf { it.delay }
+        castHint=if(partner!=null) "二重詠唱：${bossInfo.attackNames[cue.slot]} ＋ $partner" else attack.hint
+        castDuration=arena.hazards.maxOf { it.delay }; castEnd=elapsed+castDuration
         val finish=elapsed+arena.hazards.maxOf { it.delay+it.duration }
         if(cue.wave+1<attack.waves) normalCues.add(cue.copy(at=finish+difficulty.comboGap,wave=cue.wave+1))
         nextPattern=finish+difficulty.recovery
         sounds.add("cast")
     }
 
+    /** A simultaneous volley must offer one route outside both attacks, including knockback landing. */
+    private fun distanceToSafety(created: List<Hazard>): Double {
+        var distance=Double.POSITIVE_INFINITY
+        for(x in 20..580 step 10) for(y in 20..310 step 10) {
+            var xx=x.toDouble(); var yy=y.toDouble()
+            var safe=created.none { it.dangerousAt(xx,yy) }
+            if(safe) for(h in created) if(h.shape=="knock") {
+                val a=atan2(yy-h.y,xx-h.x); xx+=cos(a)*h.a; yy+=sin(a)*h.a
+                if(xx<16 || xx>584 || yy<20 || yy>318 || created.any { it.shape!="knock" && it.dangerousAt(xx,yy) }) safe=false
+            }
+            if(safe) distance=min(distance,hypot(x-player.x,y-player.y))
+        }
+        return distance
+    }
+
+    /** Pair a boss's own normal motif with this wave. Try its authored variants to avoid contradictory safe zones. */
+    private fun combineNormal(primary: MutableList<Hazard>,exclude: Int,ordinal: Int): String {
+        val attacks=BossCombat.forBoss(bossInfo.id)
+        val delay=primary.minOf { it.delay }
+        val first=primary.filter { abs(it.delay-delay)<.01 }
+        for(offset in attacks.indices) {
+            val slot=(ordinal+offset).mod(attacks.size)
+            if(slot==exclude) continue
+            val attack=attacks[slot]
+            for(w in 0 until attack.waves) for(side in 0..1) {
+                val arena=NormalArena(this,player.x,player.y,ordinal+side)
+                attack.draw(arena,(ordinal+w).mod(attack.waves))
+                arena.hazards.forEach { it.delay=delay }
+                if(distanceToSafety(first+arena.hazards).isFinite()) {
+                    primary.addAll(arena.hazards)
+                    return bossInfo.attackNames[slot]
+                }
+            }
+        }
+        // Some inward/outward pairs have mutually exclusive safe regions. Mirroring
+        // the secondary formation preserves its geometry while opening a shared gap.
+        for(slot in attacks.indices) if(slot!=exclude) {
+            val attack=attacks[slot]
+            for(w in 0 until attack.waves) {
+                val arena=NormalArena(this,player.x,player.y,ordinal)
+                attack.draw(arena,w)
+                val mirrored=arena.hazards.map { it.copy(x=600-it.x,y=340-it.y,angle=it.angle+PI,delay=delay) }
+                if(distanceToSafety(first+mirrored).isFinite()) {
+                    primary.addAll(mirrored)
+                    return bossInfo.attackNames[slot]
+                }
+            }
+        }
+        error("No compatible double cast for ${bossInfo.id}: $exclude / $ordinal")
+    }
+
     private fun ensureReachable(created: List<Hazard>,reaction: Double) {
         if(created.isEmpty()) return
         val delay=created.minOf { it.delay }
         val first=created.filter { abs(it.delay-delay)<.01 }
-        var distance=Double.POSITIVE_INFINITY
-        for(x in 20..580 step 10) for(y in 20..310 step 10) {
-            if(first.none { it.dangerousAt(x.toDouble(),y.toDouble()) })
-                distance=min(distance,hypot(x-player.x,y-player.y))
-        }
+        val distance=distanceToSafety(first)
         check(distance.isFinite()) { "No safe space for ${bossInfo.id}: $castName" }
         val extra=max(.0,distance/job.speed+reaction-delay)
         created.forEach { it.delay+=extra }
@@ -428,7 +480,7 @@ class GameEngine(random: Random=Random.Default) {
     fun cast(pattern: Pattern, ultimate: Boolean, ordinal: Int) {
         val start=hazards.size
         val strong=if(ultimate) 1.65 else 1.0
-        val delay=if(ultimate) 1.75 else max(1.1,1.65-(run?.stage ?: 0)*.012)
+        val delay=(if(ultimate) 1.75 else max(1.1,1.65-(run?.stage ?: 0)*.012))*BossTiming.SCALE
         val angle=atan2(player.y-boss.y,player.x-boss.x)
         fun add(shape: String,x: Double,y: Double,a: Double,b: Double=0.0,ang: Double=0.0,wait: Double=delay,label: String="") {
             hazards.add(Hazard(shape,x,y,a,b,ang,wait,multiplier=strong,sourceX=boss.x,sourceY=boss.y,label=label,ultimate=ultimate))
@@ -465,11 +517,11 @@ class GameEngine(random: Random=Random.Default) {
             Pattern.SPIRAL -> for(i in 0..3) add("line",300.0,170.0,750.0,32.0,ordinal*.42+i*PI/4)
             Pattern.CHASE -> for(i in 0..2) {
                 val x=(player.x+moveX*i*48).coerceIn(30.0,570.0); val y=(player.y+moveY*i*48).coerceIn(30.0,305.0)
-                add("circle",x,y,44.0,wait=delay+i*.22)
+                add("circle",x,y,44.0,wait=delay+i*.22*BossTiming.SCALE)
             }
             Pattern.SIDES -> { add("line",300.0,38.0,650.0,116.0); add("line",300.0,303.0,650.0,116.0) }
             Pattern.WAVE -> { val gap=ordinal%3; for(i in 0..2) if(i!=gap) add("line",300.0,58.0+i*111,650.0,67.0) }
-            Pattern.FRONTBACK -> { add("cone",boss.x,boss.y,600.0,PI*.98,angle); add("cone",boss.x,boss.y,600.0,PI*.98,angle+PI,delay+.8) }
+            Pattern.FRONTBACK -> { add("cone",boss.x,boss.y,600.0,PI*.98,angle); add("cone",boss.x,boss.y,600.0,PI*.98,angle+PI,delay+.8*BossTiming.SCALE) }
             Pattern.GRID -> {
                 for(i in 0..3) add("line",75.0+i*150,170.0,400.0,32.0,PI/2)
                 for(i in 0..2) add("line",300.0,55.0+i*115,650.0,28.0)
@@ -478,9 +530,15 @@ class GameEngine(random: Random=Random.Default) {
         }
         // Fairness: even an unbuffed character at an edge must be able to reach a safe
         // point after seeing the telegraph. Sequential casts wait for this resolution.
-        val created=hazards.drop(start)
-        ensureReachable(created,.4)
-        castEnd=elapsed+created.minOf { it.delay }
+        val created=hazards.drop(start).toMutableList()
+        val primaryCount=created.size
+        if(ultimate && enraged) {
+            val partner=combineNormal(created,-1,ordinal+patternNumber++)
+            hazards.addAll(created.drop(primaryCount))
+            castHint="二重詠唱：$partner ＋ $castHint"
+        }
+        ensureReachable(created,.4*BossTiming.SCALE)
+        castDuration=created.minOf { it.delay }; castEnd=elapsed+castDuration
         sounds.add("cast")
     }
 

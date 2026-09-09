@@ -89,15 +89,7 @@ class BossCombatRenderTest {
                 e.changeScreen(Screen.CUTIN); e.screenAge=.8
                 view.draw(Canvas(frame)); assertTrue("${boss.id} cutin is in color",colored(frame)>1000)
                 if(stage in listOf(0,12,17,23,30,31)) save(frame,"color-cutin-${boss.id}")
-                // Broad backdrop stays in the attack's primary hue; secondary sparks
-                // cannot turn every boss's background into the same warm color.
-                val cutin=Bitmap.createBitmap(960,190,Bitmap.Config.ARGB_8888)
-                BattleEffects().cutin(Canvas(cutin),boss.id,0f,0f,960f,190f,.8)
-                val energy=UltimateColors.forBoss(boss.id).energy
-                var primaryPixels=0
-                for(px in 0 until 960) for(py in 0 until 190) if(cutin.getPixel(px,py)==energy) primaryPixels++
-                assertTrue("${boss.id} backdrop follows attack energy",primaryPixels>15000)
-                cutin.recycle()
+
             }
             gallery.forEachIndexed { i,b -> save(b,if(i<2) "normal-attacks-${i+1}" else "ultimate-colors-${i-1}"); b.recycle() }
             frame.recycle(); view.suspend()

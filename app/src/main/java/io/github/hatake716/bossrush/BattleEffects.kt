@@ -224,31 +224,9 @@ class BattleEffects {
     private fun palette(ultimate: Boolean,bossId: String)=if(ultimate) UltimateColors.forBoss(bossId)
         else CombatPalette(Ink.mid,Ink.light,Ink.light,Ink.dark)
 
+    private val mythicCutin=MythicCutin()
     fun cutin(c: Canvas,bossId: String,left: Float,top: Float,width: Float,height: Float,age: Double) {
-        val colors=UltimateColors.forBoss(bossId)
-        p.style=Paint.Style.FILL; p.alpha=255
-        p.shader=LinearGradient(left,top,left+width,top+height,
-            intArrayOf(colors.cutinEdge,colors.energy,colors.energy,colors.cutinEdge),floatArrayOf(0f,.25f,.65f,1f),Shader.TileMode.CLAMP)
-        c.drawRect(left,top,left+width,top+height,p); p.shader=null
-        c.save(); c.clipRect(left,top,left+width,top+height)
-        val cx=left+width*.31f; val cy=top+height*.52f
-        for(i in 0..27) {
-            val angle=i*PI/14+age*.20
-            val near=65+sin(age*1.7+i)*13
-            stroke(if(i%3==0) colors.core else colors.accent,if(i%3==0) 3f else 6f,185)
-            line(c,cx+cos(angle)*near,cy+sin(angle)*near,cx+cos(angle)*width,cy+sin(angle)*width)
-        }
-        for(i in 0..4) {
-            val r=43f+i*23f+(age*23%23).toFloat()
-            stroke(if(i%2==0) colors.core else colors.energy,2f,185)
-            c.drawCircle(cx,cy,r,p)
-        }
-        for(i in 0..35) {
-            val xx=left+((i*113+age*80)%width).toFloat(); val yy=top+(i*67%height)
-            fill(if(i%2==0) colors.core else colors.energy,205)
-            c.drawRect(xx,yy,xx+3+i%4*2,yy+3,p)
-        }
-        c.restore(); p.alpha=255
+        mythicCutin.draw(c,bossId,left,top,width,height,age)
     }
 
 }

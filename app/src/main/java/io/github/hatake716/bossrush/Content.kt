@@ -3,10 +3,10 @@ package io.github.hatake716.bossrush
 import kotlin.math.roundToInt
 
 enum class Job(val label: String, val english: String, val role: String, val hp: Double, val speed: Double, val lore: String) {
-    WARRIOR("戦士", "WARRIOR", "剣と盾の守り手", 150.0, 110.0, "強い剣と堅い盾。懐に飛び込んで戦う。"),
-    MAGE("魔法使い", "MAGE", "炎と氷の詠み手", 105.0, 112.0, "直線の炎と追尾する氷で、離れて戦う。"),
-    SUMMONER("召喚士", "SUMMONER", "小さな仲間と共に", 115.0, 108.0, "仲間は最大2体。召喚ゲージの回復は半分。"),
-    THIEF("盗賊", "THIEF", "幸運を盗む旅人", 95.0, 119.0, "能力は控えめ。お金1.6倍と特別な戦利品。")
+    WARRIOR("戦士", "WARRIOR", "剣と盾の守り手", 150.0, 132.0, "強い剣と堅い盾。懐に飛び込んで戦う。"),
+    MAGE("魔法使い", "MAGE", "炎と氷の詠み手", 105.0, 134.4, "直線の炎と追尾する氷で、離れて戦う。"),
+    SUMMONER("召喚士", "SUMMONER", "小さな仲間と共に", 115.0, 129.6, "仲間は最大2体。召喚ゲージの回復は半分。"),
+    THIEF("盗賊", "THIEF", "幸運を盗む旅人", 95.0, 142.8, "能力は控えめ。お金1.6倍と特別な戦利品。")
 }
 
 data class Skill(val name: String, val glyph: String, val power: Double, val cooldown: Double, val range: Double, val cost: Double, val description: String)

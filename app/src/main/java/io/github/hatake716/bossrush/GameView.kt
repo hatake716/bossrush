@@ -283,7 +283,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             text(c,b.ultimate,450f,294f,20f)
             wrap(c,b.hint,450f,325f,445f,14f)
             text(c,"通常：${b.attackNames.joinToString(" / ")}",431f,386f,13f,Ink.mid)
-            text(c,"HP1/3で覚醒。その後は通常技と必殺技を使う。",431f,407f,12f,Ink.mid)
+            text(c,"HP1/2で覚醒。1/4以下は二重詠唱！",431f,407f,12f,Ink.mid)
             text(c,"全回復して挑戦  /  アイテム ${engine.run!!.inventory.size}/5",431f,424f,15f)
             button(c,"戦闘開始  →",665f,454f,259f,51f,true) { engine.beginBattle() }
         }
@@ -362,9 +362,10 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         if(e.castEnd>e.elapsed) {
             val color=if(e.ultimateActive) UltimateColors.forBoss(b.id).energy else Ink.light
             text(c,e.castName,28f,455f,if(e.castName.length>19) 11f else 14f,color)
-            bar(c,28f,464f,241f,8f,e.castEnd-e.elapsed,1.85,color)
+            bar(c,28f,464f,241f,8f,e.castEnd-e.elapsed,e.castDuration.coerceAtLeast(.001),color)
         } else pixel(c,"READ. DODGE. STRIKE.",28f,456f,1.3f,Ink.mid)
-        text(c,if(e.messageTime>0) e.message else e.castHint,282f,455f,13f)
+        val hint=if(e.messageTime>0) e.message else e.castHint
+        wrap(c,hint,282f,451f,340f+extra,12f,Ink.light,17f)
         // Floating thumb stick. Anywhere in the left half of the arena can be used.
         p.color=Ink.dark; c.drawCircle(103f,374f,48f,p); p.style=Paint.Style.STROKE; p.color=Ink.mid; p.strokeWidth=2f; c.drawCircle(103f,374f,47f,p); p.style=Paint.Style.FILL
         rect(c,77f,370f,52f,8f,Ink.deep); rect(c,99f,348f,8f,52f,Ink.deep)
@@ -417,17 +418,16 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         scrim(c)
         val b=engine.bossInfo
         val colors=UltimateColors.forBoss(b.id)
-        battleEffects.cutin(c,b.id,viewport.fullLeft,161f,viewport.fullWidth,190f,engine.screenAge)
-        border(c,viewport.fullLeft,158f,viewport.fullWidth,196f,colors.energy,3f)
+        battleEffects.cutin(c,b.id,viewport.fullLeft,130f,viewport.fullWidth,264f,engine.screenAge)
+        border(c,viewport.fullLeft,128f,viewport.fullWidth,268f,colors.cutinEdge,2f)
         shifted(c,extra/2) {
-            rect(c,364f,182f,565f,151f,Color.argb(228,17,12,33))
-            art.boss(c,b.id,202f,340f,280f,172f)
-            pixel(c,"LIMIT BREAK",384f,192f,2.8f,colors.energy)
-            text(c,b.ultimate,383f,269f,30f,colors.core)
-            text(c,b.name,385f,309f,18f,colors.accent)
-            text(c,"残り1/3 ── 神々の真なる力",480f,119f,18f,colors.core,Paint.Align.CENTER)
-            wrap(c,b.hint,170f,401f,620f,19f,Ink.light,30f)
-            pixel(c,"READ THE SIGNS",480f,475f,1.7f,Ink.mid,true)
+            art.boss(c,b.id,228f,356f,272f,164f)
+            pixel(c,"LIMIT BREAK",490f,218f,2.8f,colors.energy)
+            text(c,b.ultimate,490f,282f,24f,colors.core)
+            text(c,b.name,490f,321f,18f,colors.accent)
+            text(c,"残り1/2 ── 神々の真なる力",480f,100f,18f,colors.core,Paint.Align.CENTER)
+            wrap(c,b.hint,170f,430f,620f,19f,Ink.light,30f)
+            pixel(c,"READ THE SIGNS",480f,502f,1.7f,Ink.mid,true)
         }
     }
     private fun paused(c: Canvas) {

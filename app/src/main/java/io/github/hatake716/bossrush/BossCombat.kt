@@ -4,12 +4,14 @@ import kotlin.math.*
 import kotlin.random.Random
 
 /** Encounter pacing is independent from player damage and the 30-second HP budget. */
+object BossTiming { const val SCALE = .5 }
+
 data class BossDifficulty(val stage: Int) {
     private val t=stage.coerceIn(0,31)/31.0
-    val warning get()=1.85-.60*t
-    val reaction get()=.55-.25*t
-    val recovery get()=1.05-.50*t
-    val comboGap get()=.65-.30*t
+    val warning get()=(1.85-.60*t)*BossTiming.SCALE
+    val reaction get()=(.55-.25*t)*BossTiming.SCALE
+    val recovery get()=(1.05-.50*t)*BossTiming.SCALE
+    val comboGap get()=(.65-.30*t)*BossTiming.SCALE
     val damage get()=15.0+stage*1.35+stage*stage*.010
     val ultimateChance get()=.22+.18*t
 }
