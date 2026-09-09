@@ -1,6 +1,7 @@
 package io.github.hatake716.bossrush
 
 import android.os.Bundle
+import android.os.Build
 import android.view.WindowManager
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -18,6 +19,11 @@ class MainActivity: ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         WindowCompat.setDecorFitsSystemWindows(window,false)
+        if(Build.VERSION.SDK_INT>=28) window.attributes=window.attributes.apply {
+            layoutInDisplayCutoutMode=if(Build.VERSION.SDK_INT>=30)
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            else WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
         WindowInsetsControllerCompat(window,window.decorView).apply {
             hide(WindowInsetsCompat.Type.systemBars())
             systemBarsBehavior=WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE

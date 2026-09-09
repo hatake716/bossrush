@@ -54,14 +54,26 @@ class BackgroundArt(private val assets: AssetManager) {
     }
 
     fun battle(c: Canvas,bossId: String,left: Float=0f,top: Float=0f,width: Float=600f,height: Float=334f) {
+        fullImage(c,"battle_$bossId",left,top,width,height,battlefield)
+    }
+
+    fun portrait(c: Canvas,bossId: String,left: Float,top: Float,width: Float,height: Float) {
         cover(c,"battle_$bossId",left,top,width,height,battlefield)
     }
 
-    fun landscape(c: Canvas,color: Boolean=false) {
+    private fun fullImage(c: Canvas,key: String,left: Float,top: Float,width: Float,height: Float,filter: ColorFilter?) {
+        destination.set(left,top,left+width,top+height)
+        paint.colorFilter=filter
+        c.drawBitmap(bitmap(key),null,destination,paint)
+        paint.colorFilter=null
+    }
+
+    fun landscape(c: Canvas,color: Boolean=false,left: Float=0f,top: Float=57f,width: Float=960f,height: Float=483f) {
         // One composition: the title withholds its color; the ending reveals it.
-        cover(c,"worldtree",0f,57f,960f,483f,if(color) null else title)
+        // Flexible scenery fills the display; characters and UI use a uniform scale.
+        fullImage(c,"worldtree",left,top,width,height,if(color) null else title)
         shade.shader=titleShade
-        c.drawRect(0f,57f,580f,540f,shade)
+        c.drawRect(left,top,580f,top+height,shade)
         shade.shader=null
     }
 }

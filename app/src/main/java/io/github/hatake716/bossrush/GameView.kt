@@ -6,6 +6,8 @@ import android.graphics.*
 import android.os.Bundle
 import android.view.*
 import android.view.accessibility.*
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import kotlin.math.*
 
 data class UiButton(val label: String,val rect: RectF,val enabled: Boolean=true,val skill: Int=-1,val action: () -> Unit)
@@ -22,7 +24,32 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     private val p=Paint().apply { isAntiAlias=false }
     private val type=Paint().apply { isAntiAlias=true; typeface=Typeface.create("sans-serif",Typeface.NORMAL) }
     private val buttons=mutableListOf<UiButton>()
-    private var scale=1f; private var ox=0f; private var oy=0f
+    internal var viewport=GameViewport.fit(960,540)
+        private set
+    private var cutoutLeft=0; private var cutoutTop=0; private var cutoutRight=0; private var cutoutBottom=0
+    private val scale get()=viewport.scale
+    private val ox get()=viewport.x
+    private val oy get()=viewport.y
+    private val extra get()=viewport.extra
+    private val headerTop get()=(cutoutTop-viewport.y)/viewport.scale
+    private val fullBottom get()=viewport.fullTop+viewport.fullHeight
+    internal fun safeArea(left: Int,top: Int,right: Int,bottom: Int) {
+        if(left==cutoutLeft && top==cutoutTop && right==cutoutRight && bottom==cutoutBottom) return
+        cutoutLeft=left; cutoutTop=top; cutoutRight=right; cutoutBottom=bottom
+        updateViewport(); resetInput(); windowChanged=true; invalidate()
+    }
+    private fun updateViewport() {
+        viewport=GameViewport.fit(width.coerceAtLeast(1),height.coerceAtLeast(1),cutoutLeft,cutoutTop,cutoutRight,cutoutBottom)
+    }
+    override fun onSizeChanged(w: Int,h: Int,oldw: Int,oldh: Int) {
+        super.onSizeChanged(w,h,oldw,oldh); updateViewport(); resetInput(); windowChanged=true
+    }
+    private inline fun shifted(c: Canvas,dx: Float,dy: Float=0f,draw: () -> Unit) {
+        val first=buttons.size
+        c.save(); c.translate(dx,dy); draw(); c.restore()
+        for(i in first until buttons.size) buttons[i].rect.offset(dx,dy)
+    }
+    private fun fullRect(c: Canvas,color: Int) = rect(c,viewport.fullLeft,viewport.fullTop,viewport.fullWidth,viewport.fullHeight,color)
     private var lastFrame=0L; private var running=false
     private var clock=0.0
     private var lastScreen=Screen.TITLE
@@ -40,6 +67,11 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     init {
         isFocusable=true; isFocusableInTouchMode=true; importantForAccessibility=IMPORTANT_FOR_ACCESSIBILITY_YES
         contentDescription="BOSSRUSH タイトル"
+        ViewCompat.setOnApplyWindowInsetsListener(this) { _,insets ->
+            val safe=insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.displayCutout())
+            safeArea(safe.left,safe.top,safe.right,safe.bottom)
+            insets
+        }
     }
     fun resume() { if(!running) { running=true; lastFrame=0; audio.start(); Choreographer.getInstance().postFrameCallback(this) } }
     fun suspend() { running=false; engine.pause(); resetInput(); audio.stop(); Choreographer.getInstance().removeFrameCallback(this) }
@@ -109,16 +141,25 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         buttons.add(UiButton(label,RectF(x,y,x+w,y+h),enabled,skill,action))
     }
     private fun header(c: Canvas,section: String,back: Boolean=true) {
-        rect(c,0f,0f,960f,57f,Ink.dark); rect(c,24f,55f,912f,1f,Ink.mid)
-        art.icon(c,"sword",28f,16f,1.6f); pixel(c,"BOSSRUSH",64f,19f,2.4f)
-        pixel(c,section,300f,22f,1.5f,Ink.mid)
-        button(c,if(audio.enabled) "♪ ON" else "♪ OFF",803f,12f,66f,31f) { audio.enabled=!audio.enabled; onSoundChanged?.invoke(audio.enabled) }
-        if(back) button(c,"戻る",880f,12f,57f,31f) { goBack() }
+        shifted(c,0f,headerTop) {
+            rect(c,viewport.fullLeft,0f,viewport.fullWidth,57f,Ink.dark); rect(c,24f,55f,912f+extra,1f,Ink.mid)
+            art.icon(c,"sword",28f,16f,1.6f); pixel(c,"BOSSRUSH",64f,19f,2.4f)
+            pixel(c,section,300f,22f,1.5f,Ink.mid)
+            button(c,if(audio.enabled) "♪ ON" else "♪ OFF",803f+extra,12f,66f,31f) { audio.enabled=!audio.enabled; onSoundChanged?.invoke(audio.enabled) }
+            if(back) button(c,"戻る",880f+extra,12f,57f,31f) { goBack() }
+        }
     }
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        scale=min(width/960f,height/540f); ox=(width-960*scale)/2; oy=(height-540*scale)/2
-        canvas.drawColor(Ink.dark); canvas.save(); canvas.translate(ox,oy); canvas.scale(scale,scale); canvas.clipRect(0f,0f,960f,540f)
+        updateViewport()
+        canvas.drawColor(Ink.dark); canvas.save(); canvas.translate(ox,oy); canvas.scale(scale,scale)
+        if(engine.screen !in listOf(Screen.TITLE,Screen.ENDING,Screen.GAMEOVER)) {
+            val v=viewport
+            if(engine.run!=null && engine.screen in listOf(Screen.BATTLE,Screen.CUTIN,Screen.PAUSED,Screen.INTRO))
+                backgrounds.battle(canvas,engine.bossInfo.id,v.fullLeft,v.fullTop,v.fullWidth,v.fullHeight)
+            else backgrounds.landscape(canvas,false,v.fullLeft,v.fullTop,v.fullWidth,v.fullHeight)
+            fullRect(canvas,Color.argb(220,16,29,26))
+        }
         buttons.clear()
         when(engine.screen) {
             Screen.TITLE -> title(canvas)
@@ -148,9 +189,10 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         }
     }
     private fun landscape(c: Canvas,color: Boolean=false) {
-        backgrounds.landscape(c,color)
+        val v=viewport
+        backgrounds.landscape(c,color,v.fullLeft,v.fullTop,v.fullWidth,v.fullHeight)
         val pal=if(color) Ink.dawn else Ink.palette
-        art.sprite(c,if(color) art.heroKey(engine.job) else "warrior",826f,473f,1.45f,color=color)
+        art.sprite(c,if(color) art.heroKey(engine.job) else "warrior",v.fullLeft+v.fullWidth*.8604f,v.fullTop+v.fullHeight*.824f,1.45f,color=color)
         for(i in 0..13) {
             val xx=(520+i*37%357).toFloat(); val yy=(300+(i*31+clock*9)%150).toFloat()
             rect(c,xx,yy,3f,3f,if(color && i%3==0) Color.rgb(230,164,111) else pal[2])
@@ -172,15 +214,15 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         button(c,"遊び方",48f,438f,123f,36f) { returnScreen=Screen.TITLE; engine.changeScreen(Screen.HELP) }
         button(c,"神話図鑑",185f,438f,123f,36f) { returnScreen=Screen.TITLE; engine.changeScreen(Screen.CODEX) }
         pixel(c,"BEST ${bestScore.toString().padStart(6,'0')}",48f,502f,1.65f,Ink.mid)
-        rect(c,638f,495f,288f,29f,Color.argb(215,16,29,26))
-        pixel(c,"32 GODS / 4 HEROES / 1 DAWN",649f,505f,1.2f,Ink.mid)
+        rect(c,638f+extra,fullBottom-45f,288f,29f,Color.argb(215,16,29,26))
+        pixel(c,"32 GODS / 4 HEROES / 1 DAWN",649f+extra,fullBottom-35f,1.2f,Ink.mid)
     }
     private fun jobs(c: Canvas) {
         header(c,"CHOOSE YOUR HERO")
         pixel(c,"WHO WILL FACE THE GODS?",36f,83f,2.4f)
         text(c,"色を失った世界に、小さな勇者が立ち上がる。",36f,126f,15f,Ink.mid)
         Job.entries.forEachIndexed { i,job ->
-            val x=36f+i*226; val selected=engine.selectedJob==job
+            val x=36f+i*(226+extra/3); val selected=engine.selectedJob==job
             rect(c,x,149f,211f,243f,if(selected) Ink.deep else Ink.dark); border(c,x,149f,211f,243f,if(selected) Ink.light else Ink.mid)
             pixel(c,"0${i+1}",x+14,163f,1.5f,Ink.mid)
             art.sprite(c,art.heroKey(job),x+106,264f,2.7f)
@@ -193,28 +235,30 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         val j=engine.selectedJob
         text(c,j.lore,37f,424f,16f)
         text(c,Skills.all.getValue(j).joinToString("  /  ") { it.name },37f,453f,14f,Ink.mid)
-        button(c,"この職業で出発  →",673f,457f,251f,51f,true) { engine.newRun() }
+        button(c,"この職業で出発  →",673f+extra,457f,251f,51f,true) { engine.newRun() }
         pixel(c,"LEVEL 1 - 16",37f,496f,1.5f,Ink.mid)
     }
     private fun intro(c: Canvas) {
         val b=engine.bossInfo; val stage=engine.run!!.stage
         header(c,"THE NEXT ENCOUNTER")
-        rect(c,36f,79f,355f,416f,Ink.deep); border(c,36f,79f,355f,416f)
+        rect(c,36f,79f,355f+extra,416f,Ink.deep); border(c,36f,79f,355f+extra,416f)
         pixel(c,"ENCOUNTER ${(stage+1).toString().padStart(2,'0')} / 32",60f,103f,1.8f)
-        backgrounds.battle(c,b.id,38f,142f,351f,276f)
-        art.boss(c,b.id,214f,405f,300f,270f)
-        text(c,b.realm,214f,447f,19f,Ink.light,Paint.Align.CENTER)
-        pixel(c,"${b.bpm} BPM",214f,467f,1.2f,Ink.mid,true)
-        text(c,b.epithet,431f,108f,15f,Ink.mid)
-        text(c,b.name,428f,153f,34f)
-        wrap(c,b.lore,431f,195f,460f,16f)
-        rect(c,431f,237f,491f,126f,Ink.deep)
-        pixel(c,"LIMIT BREAK",450f,252f,1.4f,Ink.mid)
-        text(c,b.ultimate,450f,294f,20f)
-        wrap(c,b.hint,450f,325f,445f,14f)
-        text(c,"HPが残り1/3で発動。カットインの後に連続攻撃。",431f,390f,14f,Ink.mid)
-        text(c,"全回復して挑戦  /  アイテム ${engine.run!!.inventory.size}/5",431f,424f,15f)
-        button(c,"戦闘開始  →",665f,454f,259f,51f,true) { engine.beginBattle() }
+        backgrounds.portrait(c,b.id,38f,142f,351f+extra,276f)
+        art.boss(c,b.id,214f+extra/2,405f,300f+extra,270f)
+        text(c,b.realm,214f+extra/2,447f,19f,Ink.light,Paint.Align.CENTER)
+        pixel(c,"${b.bpm} BPM",214f+extra/2,467f,1.2f,Ink.mid,true)
+        shifted(c,extra) {
+            text(c,b.epithet,431f,108f,15f,Ink.mid)
+            text(c,b.name,428f,153f,34f)
+            wrap(c,b.lore,431f,195f,460f,16f)
+            rect(c,431f,237f,491f,126f,Ink.deep)
+            pixel(c,"LIMIT BREAK",450f,252f,1.4f,Ink.mid)
+            text(c,b.ultimate,450f,294f,20f)
+            wrap(c,b.hint,450f,325f,445f,14f)
+            text(c,"HPが残り1/3で発動。カットインの後に連続攻撃。",431f,390f,14f,Ink.mid)
+            text(c,"全回復して挑戦  /  アイテム ${engine.run!!.inventory.size}/5",431f,424f,15f)
+            button(c,"戦闘開始  →",665f,454f,259f,51f,true) { engine.beginBattle() }
+        }
     }
     private fun bar(c: Canvas,x: Float,y: Float,w: Float,h: Float,value: Double,maxValue: Double,color: Int=Ink.light) {
         rect(c,x,y,w,h,Ink.dark); border(c,x,y,w,h,Ink.mid,1f)
@@ -223,13 +267,17 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     private fun battle(c: Canvas) {
         val e=engine; val r=e.run!!; val b=e.bossInfo
         header(c,"${(r.stage+1).toString().padStart(2,'0')} / 32   ${b.id.uppercase()}",false)
-        button(c,"II",880f,12f,57f,31f) { e.pause() }
+        shifted(c,0f,headerTop) { button(c,"II",880f+extra,12f,57f,31f) { e.pause() } }
         text(c,b.name,28f,80f,19f)
-        bar(c,225f,65f,307f,16f,e.boss.hp,e.boss.maxHp)
-        pixel(c,"${ceil(e.boss.hp/e.boss.maxHp*100).toInt()}%",543f,69f,1.35f)
-        rect(c,28f,96f,600f,334f,Ink.deep); border(c,25f,93f,606f,340f)
-        c.save(); c.translate(28f,96f); c.clipRect(0f,0f,600f,334f)
-        backgrounds.battle(c,b.id)
+        bar(c,225f,65f,307f+extra,16f,e.boss.hp,e.boss.maxHp)
+        pixel(c,"${ceil(e.boss.hp/e.boss.maxHp*100).toInt()}%",543f+extra,69f,1.35f)
+        backgrounds.battle(c,b.id,28f,96f,600f+extra,334f)
+        border(c,25f,93f,606f+extra,340f)
+        if(extra>0) {
+            rect(c,28f,96f,extra/2,334f,Color.argb(80,16,29,26))
+            rect(c,628f+extra/2,96f,extra/2,334f,Color.argb(80,16,29,26))
+        }
+        c.save(); c.translate(28f+extra/2,96f); c.clipRect(0f,0f,600f,334f)
         p.color=Ink.mid; p.style=Paint.Style.STROKE; p.strokeWidth=1f
         c.drawOval(80f,12f,520f,327f,p); c.drawOval(92f,20f,508f,319f,p); p.style=Paint.Style.FILL
         for(i in 0..7) {
@@ -293,35 +341,37 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         rect(c,77f,370f,52f,8f,Ink.deep); rect(c,99f,348f,8f,52f,Ink.deep)
         p.color=Ink.mid; c.drawCircle(103f+stickX*25,374f+stickY*25,18f,p)
         p.color=Ink.light; c.drawCircle(103f+stickX*25,374f+stickY*25,5f,p)
-        rect(c,653f,72f,283f,221f,Ink.deep); border(c,653f,72f,283f,221f)
-        art.sprite(c,art.heroKey(e.job),687f,127f,1.05f)
-        text(c,e.job.label,723f,101f,19f); pixel(c,"${e.elapsed.toInt()/60}:${(e.elapsed.toInt()%60).toString().padStart(2,'0')}",861f,89f,1.7f,Ink.light)
-        text(c,"HP ${ceil(e.player.hp).toInt()} / ${e.player.maxHp.toInt()}",723f,123f,13f)
-        bar(c,671f,141f,247f,15f,e.player.hp,e.player.maxHp)
-        text(c,if(e.job==Job.SUMMONER) "召喚ゲージ  +10/s" else "アクションゲージ  +20/s",671f,181f,12f,Ink.mid)
-        bar(c,671f,190f,247f,12f,e.gauge,100.0)
-        text(c,"${r.gold} G",671f,229f,17f); pixel(c,"SCORE ${r.score}",768f,218f,1.25f,Ink.mid)
-        val buffNames=mapOf("shield" to "盾","focus" to "魔力","power" to "攻↑","armor" to "守↑","haste" to "速↑","speed" to "気合","invisible" to "無敵","clones" to "三影")
-        val active=e.buffs.filter { it.value>0 }.entries.joinToString(" ") { "${buffNames[it.key]}${ceil(it.value).toInt()}s" }
-        text(c,if(active.isEmpty()) (if(e.job==Job.SUMMONER) "仲間 ${e.summons.size}/2" else "足元の小さな丸が当たり判定") else active,671f,260f,12f,Ink.light)
-        if(e.fortune) text(c,"黄金の印：報酬 ×3",671f,281f,11f,Ink.mid)
-        Skills.all.getValue(e.job).forEachIndexed { i,s ->
-            val x=653f+(i%2)*145; val y=310f+(i/2)*88
-            val ready=e.cooldowns[i]<=0 && e.restTime<=0
-            val held=e.heldSkill==i
-            rect(c,x,y,138f,77f,if(held) Ink.light else Ink.deep); border(c,x,y,138f,77f,if(ready) Ink.light else Ink.mid)
-            art.icon(c,s.glyph,x+11,y+12,1.7f,if(held) Ink.dark else Ink.light)
-            pixel(c,"LV${e.levels[i]}",x+92,y+11,1.2f,if(held) Ink.dark else Ink.mid)
-            text(c,if(e.job==Job.SUMMONER&&i==2&&e.summons.any { it.kind==2 }) "はにわで殴る" else s.name,x+69,y+58,if(s.name.length>7) 13f else 15f,if(held) Ink.dark else Ink.light,Paint.Align.CENTER)
-            if(!ready && e.cooldowns[i]>0) {
-                rect(c,x+3,y+68,(132*e.cooldowns[i]/Skills.cooldown(e.job,i,e.levels[i])).toFloat(),5f,Ink.mid)
-                text(c,"%.1fs".format(java.util.Locale.ROOT,e.cooldowns[i]),x+62,y+28,12f,if(held) Ink.dark else Ink.light)
+        shifted(c,extra) {
+            rect(c,653f,72f,283f,221f,Ink.deep); border(c,653f,72f,283f,221f)
+            art.sprite(c,art.heroKey(e.job),687f,127f,1.05f)
+            text(c,e.job.label,723f,101f,19f); pixel(c,"${e.elapsed.toInt()/60}:${(e.elapsed.toInt()%60).toString().padStart(2,'0')}",861f,89f,1.7f,Ink.light)
+            text(c,"HP ${ceil(e.player.hp).toInt()} / ${e.player.maxHp.toInt()}",723f,123f,13f)
+            bar(c,671f,141f,247f,15f,e.player.hp,e.player.maxHp)
+            text(c,if(e.job==Job.SUMMONER) "召喚ゲージ  +10/s" else "アクションゲージ  +20/s",671f,181f,12f,Ink.mid)
+            bar(c,671f,190f,247f,12f,e.gauge,100.0)
+            text(c,"${r.gold} G",671f,229f,17f); pixel(c,"SCORE ${r.score}",768f,218f,1.25f,Ink.mid)
+            val buffNames=mapOf("shield" to "盾","focus" to "魔力","power" to "攻↑","armor" to "守↑","haste" to "速↑","speed" to "気合","invisible" to "無敵","clones" to "三影")
+            val active=e.buffs.filter { it.value>0 }.entries.joinToString(" ") { "${buffNames[it.key]}${ceil(it.value).toInt()}s" }
+            text(c,if(active.isEmpty()) (if(e.job==Job.SUMMONER) "仲間 ${e.summons.size}/2" else "足元の小さな丸が当たり判定") else active,671f,260f,12f,Ink.light)
+            if(e.fortune) text(c,"黄金の印：報酬 ×3",671f,281f,11f,Ink.mid)
+            Skills.all.getValue(e.job).forEachIndexed { i,s ->
+                val x=653f+(i%2)*145; val y=310f+(i/2)*88
+                val ready=e.cooldowns[i]<=0 && e.restTime<=0
+                val held=e.heldSkill==i
+                rect(c,x,y,138f,77f,if(held) Ink.light else Ink.deep); border(c,x,y,138f,77f,if(ready) Ink.light else Ink.mid)
+                art.icon(c,s.glyph,x+11,y+12,1.7f,if(held) Ink.dark else Ink.light)
+                pixel(c,"LV${e.levels[i]}",x+92,y+11,1.2f,if(held) Ink.dark else Ink.mid)
+                text(c,if(e.job==Job.SUMMONER&&i==2&&e.summons.any { it.kind==2 }) "はにわで殴る" else s.name,x+69,y+58,if(s.name.length>7) 13f else 15f,if(held) Ink.dark else Ink.light,Paint.Align.CENTER)
+                if(!ready && e.cooldowns[i]>0) {
+                    rect(c,x+3,y+68,(132*e.cooldowns[i]/Skills.cooldown(e.job,i,e.levels[i])).toFloat(),5f,Ink.mid)
+                    text(c,"%.1fs".format(java.util.Locale.ROOT,e.cooldowns[i]),x+62,y+28,12f,if(held) Ink.dark else Ink.light)
+                }
+                buttons.add(UiButton("技${i+1} ${s.name}",RectF(x,y,x+138,y+77),true,i) { e.useSkill(i) })
             }
-            buttons.add(UiButton("技${i+1} ${s.name}",RectF(x,y,x+138,y+77),true,i) { e.useSkill(i) })
         }
         pixel(c,"ITEMS",29f,500f,1.4f,Ink.mid)
         for(i in 0..4) {
-            val x=116f+i*99
+            val x=116f+i*(99+extra/4)
             rect(c,x,484f,89f,41f,Ink.deep); border(c,x,484f,89f,41f,Ink.mid,1f)
             if(i<r.inventory.size) {
                 val item=r.inventory[i]; art.icon(c,item.icon,x+7,491f,1.6f)
@@ -329,45 +379,49 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
                 buttons.add(UiButton("アイテム${i+1} ${item.title}",RectF(x,484f,x+89,525f)) { e.selectedItem=i; e.pause() })
             } else text(c,"—",x+45,509f,14f,Ink.mid,Paint.Align.CENTER)
         }
-        text(c,"技は長押しで連続使用",795f,502f,12f,Ink.mid,Paint.Align.CENTER)
-        text(c,"休むと2秒間移動できません",795f,523f,11f,Ink.mid,Paint.Align.CENTER)
+        text(c,"技は長押しで連続使用",795f+extra,502f,12f,Ink.mid,Paint.Align.CENTER)
+        text(c,"休むと2秒間移動できません",795f+extra,523f,11f,Ink.mid,Paint.Align.CENTER)
     }
-    private fun scrim(c: Canvas) { p.color=Ink.dark; p.alpha=225; c.drawRect(0f,57f,960f,540f,p); p.alpha=255; buttons.clear() }
+    private fun scrim(c: Canvas) { fullRect(c,Color.argb(225,16,29,26)); buttons.clear() }
     private fun cutin(c: Canvas) {
         scrim(c)
         val b=engine.bossInfo
-        rect(c,0f,161f,960f,190f,Ink.light)
-        for(i in 0..28) {
+        rect(c,viewport.fullLeft,161f,viewport.fullWidth,190f,Ink.light)
+        for(i in 0..(viewport.width/33).toInt()) {
             val drift=(engine.screenAge*260%80).toFloat()
             rect(c,i*38f-drift,166f+i%5*36,54f+(i%3)*15,2f,Ink.mid)
         }
-        border(c,0f,158f,960f,196f,Ink.mid,3f)
-        art.boss(c,b.id,202f,340f,280f,172f)
-        pixel(c,"LIMIT BREAK",384f,192f,2.8f,Ink.deep)
-        text(c,b.ultimate,383f,269f,30f,Ink.dark)
-        text(c,b.name,385f,309f,18f,Ink.deep)
-        text(c,"残り1/3 ── 神々の真なる力",480f,119f,18f,Ink.light,Paint.Align.CENTER)
-        wrap(c,b.hint,170f,401f,620f,19f,Ink.light,30f)
-        pixel(c,"READ THE SIGNS",480f,475f,1.7f,Ink.mid,true)
+        border(c,viewport.fullLeft,158f,viewport.fullWidth,196f,Ink.mid,3f)
+        shifted(c,extra/2) {
+            art.boss(c,b.id,202f,340f,280f,172f)
+            pixel(c,"LIMIT BREAK",384f,192f,2.8f,Ink.deep)
+            text(c,b.ultimate,383f,269f,30f,Ink.dark)
+            text(c,b.name,385f,309f,18f,Ink.deep)
+            text(c,"残り1/3 ── 神々の真なる力",480f,119f,18f,Ink.light,Paint.Align.CENTER)
+            wrap(c,b.hint,170f,401f,620f,19f,Ink.light,30f)
+            pixel(c,"READ THE SIGNS",480f,475f,1.7f,Ink.mid,true)
+        }
     }
     private fun paused(c: Canvas) {
         scrim(c)
-        val selected=engine.selectedItem; val inv=engine.run!!.inventory
-        if(selected in inv.indices) {
-            val item=inv[selected]
-            rect(c,236f,132f,488f,303f,Ink.deep); border(c,236f,132f,488f,303f)
-            art.icon(c,item.icon,453f,166f,3.4f)
-            text(c,item.title,480f,267f,26f,Ink.light,Paint.Align.CENTER)
-            text(c,item.description,480f,306f,17f,Ink.mid,Paint.Align.CENTER)
-            button(c,"使う",490f,354f,193f,48f,true) { engine.unpause(); engine.useItem(selected) }
-            button(c,"戻る",278f,354f,193f,48f) { engine.selectedItem=-1; engine.unpause() }
-        } else {
-            pixel(c,"PAUSED",480f,132f,4f,Ink.light,true)
-            text(c,"ひと息ついて、次の一手を。",480f,207f,18f,Ink.mid,Paint.Align.CENTER)
-            button(c,"戦闘に戻る",345f,244f,270f,51f,true) { engine.unpause() }
-            button(c,"遊び方",345f,310f,270f,43f) { returnScreen=Screen.PAUSED; engine.changeScreen(Screen.HELP) }
-            button(c,"タイトルへ",345f,367f,270f,43f) { engine.changeScreen(Screen.TITLE) }
-            text(c,"つづきからは、このボスの戦闘前から再開します。",480f,464f,14f,Ink.mid,Paint.Align.CENTER)
+        shifted(c,extra/2) {
+            val selected=engine.selectedItem; val inv=engine.run!!.inventory
+            if(selected in inv.indices) {
+                val item=inv[selected]
+                rect(c,236f,132f,488f,303f,Ink.deep); border(c,236f,132f,488f,303f)
+                art.icon(c,item.icon,453f,166f,3.4f)
+                text(c,item.title,480f,267f,26f,Ink.light,Paint.Align.CENTER)
+                text(c,item.description,480f,306f,17f,Ink.mid,Paint.Align.CENTER)
+                button(c,"使う",490f,354f,193f,48f,true) { engine.unpause(); engine.useItem(selected) }
+                button(c,"戻る",278f,354f,193f,48f) { engine.selectedItem=-1; engine.unpause() }
+            } else {
+                pixel(c,"PAUSED",480f,132f,4f,Ink.light,true)
+                text(c,"ひと息ついて、次の一手を。",480f,207f,18f,Ink.mid,Paint.Align.CENTER)
+                button(c,"戦闘に戻る",345f,244f,270f,51f,true) { engine.unpause() }
+                button(c,"遊び方",345f,310f,270f,43f) { returnScreen=Screen.PAUSED; engine.changeScreen(Screen.HELP) }
+                button(c,"タイトルへ",345f,367f,270f,43f) { engine.changeScreen(Screen.TITLE) }
+                text(c,"つづきからは、このボスの戦闘前から再開します。",480f,464f,14f,Ink.mid,Paint.Align.CENTER)
+            }
         }
     }
     private fun reward(c: Canvas) {
@@ -376,11 +430,11 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         pixel(c,"BOSS DEFEATED",35f,82f,3.6f)
         text(c,"${e.bossInfo.name}を越えた。",37f,134f,17f,Ink.mid)
         text(c,"%.1f秒  /  被ダメージ %.0f  /  +%d G".format(java.util.Locale.ROOT,e.lastTime,e.lastDamage,e.lastGold),37f,165f,16f)
-        pixel(c,"+${e.lastScore}",704f,105f,3.4f,Ink.light)
+        pixel(c,"+${e.lastScore}",704f+extra,105f,3.4f,Ink.light)
         val thief=e.job==Job.THIEF
         text(c,if(e.rewardChosen) "技を強化しました" else "強化する技を1つ選択",37f,202f,19f)
         Skills.all.getValue(e.job).forEachIndexed { i,s ->
-            val x=36f+i*226; val y=221f
+            val x=36f+i*(226+extra/3); val y=221f
             rect(c,x,y,211f,if(thief) 113f else 157f,Ink.deep); border(c,x,y,211f,if(thief) 113f else 157f)
             art.icon(c,s.glyph,x+14,y+17,2f)
             text(c,s.name,x+62,y+36,15f)
@@ -392,19 +446,19 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         if(thief) {
             text(c,if(e.lootChosen) "特殊アイテムを獲得しました" else "盗賊の戦利品：4つから1つ選ぶ",37f,364f,16f)
             Item.entries.filter { it.special }.forEachIndexed { i,item ->
-                val x=36f+i*226
+                val x=36f+i*(226+extra/3)
                 button(c,item.title,x,378f,211f,34f,enabled=!e.lootChosen) { e.chooseLoot(item) }
                 text(c,item.description,x+105,429f,10f,Ink.mid,Paint.Align.CENTER)
             }
             if(e.pendingLoot!=null) {
                 text(c,"交換する所持品を選択：",37f,459f,14f)
-                e.run!!.inventory.forEachIndexed { i,item -> button(c,item.title,217f+i*141,441f,135f,27f) { e.replaceLoot(i) } }
+                e.run!!.inventory.forEachIndexed { i,item -> button(c,item.title,217f+i*(141+extra/4),441f,135f,27f) { e.replaceLoot(i) } }
             } else text(c,"特殊アイテムもストック5個に含まれます。",37f,459f,12f,Ink.mid)
         } else {
             text(c,"威力・効果はLv.1で最大の25%。Lv.16まで直線的に成長。",37f,421f,14f,Ink.mid)
             text(c,"範囲も拡大し、待機時間も短くなります。",37f,447f,14f,Ink.mid)
         }
-        button(c,if(e.run!!.stage==31) "夜明けへ  →" else "旅の商人へ  →",674f,476f,250f,45f,true,e.rewardChosen&&e.lootChosen) { e.finishReward() }
+        button(c,if(e.run!!.stage==31) "夜明けへ  →" else "旅の商人へ  →",674f+extra,476f,250f,45f,true,e.rewardChosen&&e.lootChosen) { e.finishReward() }
         pixel(c,"ONE STEP CLOSER TO DAWN",37f,491f,1.4f,Ink.mid)
     }
     private fun shop(c: Canvas) {
@@ -412,9 +466,9 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         header(c,"THE WANDERING MERCHANT")
         pixel(c,"A MOMENT OF REST",36f,83f,2.8f)
         text(c,"「次の神に挑む前に、旅の支度はいかが？」",36f,132f,16f,Ink.mid)
-        text(c,"${r.gold} G",920f,111f,27f,Ink.light,Paint.Align.RIGHT)
+        text(c,"${r.gold} G",920f+extra,111f,27f,Ink.light,Paint.Align.RIGHT)
         Item.entries.filter { !it.special }.forEachIndexed { i,item ->
-            val x=36f+i*226
+            val x=36f+i*(226+extra/3)
             rect(c,x,159f,211f,198f,Ink.deep); border(c,x,159f,211f,198f)
             art.icon(c,item.icon,x+81,178f,3f)
             text(c,item.title,x+105,251f,18f,Ink.light,Paint.Align.CENTER)
@@ -423,7 +477,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         }
         text(c,"旅のかばん  ${r.inventory.size}/5",36f,393f,18f)
         for(i in 0..4) {
-            val x=36f+i*179
+            val x=36f+i*(179+extra/4)
             val item=r.inventory.getOrNull(i)
             if(item!=null) button(c,item.title,x,410f,168f,44f) {
                 AlertDialog.Builder(context).setTitle(item.title).setMessage("${item.description}\n\nこのアイテムを手放して、かばんに空きを作りますか？")
@@ -431,7 +485,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             } else { border(c,x,410f,168f,44f,Ink.deep); text(c,"空き",x+84,438f,13f,Ink.mid,Paint.Align.CENTER) }
         }
         text(c,"${if(e.messageTime>0) e.message else "ボス戦ごとにHPとゲージは全回復。ここで自動保存されます。"}",36f,499f,13f,Ink.mid)
-        button(c,"次のボスへ  →",675f,475f,249f,46f,true) { e.leaveShop() }
+        button(c,"次のボスへ  →",675f+extra,475f,249f,46f,true) { e.leaveShop() }
     }
     private fun codex(c: Canvas) {
         header(c,"THE GODS AND THEIR KIN")
@@ -448,43 +502,49 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         }
         val b=Bosses.all[engine.selectedBoss]
         if(!portraitExpanded) contentDescription="BOSSRUSH 神話図鑑 ${b.name}。${b.epithet}。${b.lore}"
-        rect(c,459f,81f,465f,381f,Ink.deep)
-        art.boss(c,b.id,538f,232f,145f,143f)
-        text(c,"タップで拡大",538f,248f,10f,Ink.mid,Paint.Align.CENTER)
-        buttons.add(UiButton("${b.name}の姿を拡大",RectF(465f,84f,609f,253f)) { portraitExpanded=true })
-        text(c,b.name,614f,121f,24f)
-        text(c,b.epithet,614f,150f,13f,Ink.mid)
-        wrap(c,b.lore,614f,180f,289f,14f)
-        text(c,b.ultimate,481f,270f,19f)
-        wrap(c,b.hint,481f,302f,418f,15f)
-        text(c,"♪ ${b.theme}",481f,378f,17f)
-        text(c,"${b.bpm} BPM  /  ${BattleScore.themes[engine.selectedBoss].beats}拍子",481f,401f,13f,Ink.mid)
-        wrap(c,BattleScore.themes[engine.selectedBoss].character,481f,426f,418f,12f,Ink.light,18f)
+        shifted(c,extra) {
+            rect(c,459f,81f,465f,381f,Ink.deep)
+            art.boss(c,b.id,538f,232f,145f,143f)
+            text(c,"タップで拡大",538f,248f,10f,Ink.mid,Paint.Align.CENTER)
+            buttons.add(UiButton("${b.name}の姿を拡大",RectF(465f,84f,609f,253f)) { portraitExpanded=true })
+            text(c,b.name,614f,121f,24f)
+            text(c,b.epithet,614f,150f,13f,Ink.mid)
+            wrap(c,b.lore,614f,180f,289f,14f)
+            text(c,b.ultimate,481f,270f,19f)
+            wrap(c,b.hint,481f,302f,418f,15f)
+            text(c,"♪ ${b.theme}",481f,378f,17f)
+            text(c,"${b.bpm} BPM  /  ${BattleScore.themes[engine.selectedBoss].beats}拍子",481f,401f,13f,Ink.mid)
+            wrap(c,BattleScore.themes[engine.selectedBoss].character,481f,426f,418f,12f,Ink.light,18f)
+        }
         button(c,"←",36f,483f,62f,36f,enabled=codexPage>0) { codexPage--; engine.selectedBoss=codexPage*8 }
         pixel(c,"${codexPage+1} / 4",233f,496f,1.5f,Ink.mid,true)
         button(c,"→",364f,483f,62f,36f,enabled=codexPage<3) { codexPage++; engine.selectedBoss=codexPage*8 }
-        text(c,"参考：散文エッダ / 古エッダ（詳細はREADME）",481f,506f,13f,Ink.mid)
+        text(c,"参考：散文エッダ / 古エッダ（詳細はREADME）",481f+extra,506f,13f,Ink.mid)
         if(portraitExpanded) portrait(c)
     }
     private fun portrait(c: Canvas) {
         val b=Bosses.all[engine.selectedBoss]
         contentDescription="BOSSRUSH 神話図鑑 拡大 ${b.name}。${b.epithet}。${b.lore}"
-        rect(c,0f,0f,960f,540f,Ink.dark)
-        border(c,22f,22f,916f,496f,Ink.mid)
+        fullRect(c,Ink.dark)
+        border(c,22f,22f,916f+extra,496f,Ink.mid)
         pixel(c,"BESTIARY / ${(engine.selectedBoss+1).toString().padStart(2,'0')}",48f,45f,1.8f,Ink.mid)
-        text(c,b.name,645f,169f,28f)
-        wrap(c,b.epithet,647f,204f,255f,15f,Ink.mid)
-        wrap(c,b.lore,647f,249f,255f,15f,Ink.light,25f)
-        text(c,b.realm,326f,488f,16f,Ink.mid,Paint.Align.CENTER)
-        art.boss(c,b.id,326f,455f,530f,363f)
+        shifted(c,extra) {
+            text(c,b.name,645f,169f,28f)
+            wrap(c,b.epithet,647f,204f,255f,15f,Ink.mid)
+            wrap(c,b.lore,647f,249f,255f,15f,Ink.light,25f)
+        }
+        text(c,b.realm,326f+extra/2,488f,16f,Ink.mid,Paint.Align.CENTER)
+        art.boss(c,b.id,326f+extra/2,455f,530f+extra,363f)
         // Only the modal controls remain in the virtual accessibility tree.
         buttons.clear()
-        button(c,"図鑑へ戻る",789f,40f,123f,37f) { portraitExpanded=false }
-        button(c,"前の神",649f,446f,118f,44f,enabled=engine.selectedBoss>0) {
-            engine.selectedBoss--; codexPage=engine.selectedBoss/8
-        }
-        button(c,"次の神",785f,446f,118f,44f,enabled=engine.selectedBoss<31) {
-            engine.selectedBoss++; codexPage=engine.selectedBoss/8
+        shifted(c,extra) {
+            button(c,"図鑑へ戻る",789f,40f,123f,37f) { portraitExpanded=false }
+            button(c,"前の神",649f,446f,118f,44f,enabled=engine.selectedBoss>0) {
+                engine.selectedBoss--; codexPage=engine.selectedBoss/8
+            }
+            button(c,"次の神",785f,446f,118f,44f,enabled=engine.selectedBoss<31) {
+                engine.selectedBoss++; codexPage=engine.selectedBoss/8
+            }
         }
     }
     private fun help(c: Canvas) {
@@ -499,7 +559,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             "06  高いスコアへ" to "素早く倒し、被ダメージを減らすと高得点。全32体を越えると世界に色が戻ります。物理キー：WASD/矢印で移動、1〜4で技、Escで一時停止。"
         )
         topics.forEachIndexed { i,pair ->
-            val x=36f+(i%2)*455; val y=145f+(i/2)*123
+            val x=36f+(i%2)*(455+extra); val y=145f+(i/2)*123
             text(c,pair.first,x,y,18f)
             wrap(c,pair.second,x,y+27,420f,14f,Ink.mid,23f)
         }
@@ -507,7 +567,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     private fun result(c: Canvas,clear: Boolean) {
         val r=engine.run!!
         if(clear) landscape(c,true) else landscape(c)
-        if(!clear) { p.color=Ink.dark; p.alpha=200; c.drawRect(0f,57f,960f,540f,p); p.alpha=255 }
+        if(!clear) fullRect(c,Color.argb(200,16,29,26))
         header(c,if(clear) "A NEW DAWN" else "THE JOURNEY ENDS",false)
         pixel(c,if(clear) "THE WORLD" else "GAME OVER",40f,103f,4.5f,if(clear) Ink.dawn[3] else Ink.light)
         if(clear) pixel(c,"IN COLOR",40f,155f,4.5f,Ink.dawn[2])
@@ -517,10 +577,10 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         pixel(c,"SCORE ${r.score.toString().padStart(6,'0')}",58f,383f,2.4f,if(clear) Ink.dawn[3] else Ink.light)
         text(c,"${r.job.label}  /  ${r.kills}体撃破  /  %.1f秒  /  被ダメージ %.0f".format(java.util.Locale.ROOT,r.totalTime,r.totalDamage),58f,438f,13f,if(clear) Ink.dawn[2] else Ink.mid)
         button(c,"タイトルへ",40f,478f,215f,44f,true) { engine.changeScreen(Screen.TITLE) }
-        if(clear) {
-            rect(c,566f,474f,358f,49f,Color.argb(215,16,29,26))
-            text(c,"THANK YOU FOR PLAYING",736f,492f,15f,Ink.dawn[3],Paint.Align.CENTER)
-            text(c,"BOSSRUSH / ORIGINAL ART & MUSIC",736f,514f,11f,Ink.dawn[2],Paint.Align.CENTER)
+        if(clear) shifted(c,extra) {
+            rect(c,566f,fullBottom-66f,358f,49f,Color.argb(215,16,29,26))
+            text(c,"THANK YOU FOR PLAYING",736f,fullBottom-48f,15f,Ink.dawn[3],Paint.Align.CENTER)
+            text(c,"BOSSRUSH / ORIGINAL ART & MUSIC",736f,fullBottom-26f,11f,Ink.dawn[2],Paint.Align.CENTER)
         }
         else button(c,"もう一度挑む",274f,478f,227f,44f) { engine.changeScreen(Screen.JOBS) }
     }
@@ -536,7 +596,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
                         pressed=b.label
                         if(b.skill>=0 && engine.screen==Screen.BATTLE) { skillPointer=id; engine.heldSkill=b.skill; b.action() }
                     }
-                } else if(engine.screen==Screen.BATTLE && x<640 && y in 95f..433f && joystickId<0) {
+                } else if(engine.screen==Screen.BATTLE && x>=0 && x<640+extra && y in 95f..433f && joystickId<0) {
                     joystickId=id
                     // Relative drag with a fixed visible center only when touched near the thumb pad.
                     joystickOriginX=if(hypot(x-103,y-374)<65) 103f else x

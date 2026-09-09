@@ -31,8 +31,8 @@ class FeedbackRenderTest {
         instrumentation.runOnMainSync {
             val view=rule.activity.gameView; view.suspend()
             val e=view.engine; e.selectedJob=Job.WARRIOR; e.newRun(); e.beginBattle()
-            val scale=min(view.width/960f,view.height/540f)
-            val ox=(view.width-960*scale)/2; val oy=(view.height-540*scale)/2
+            val scale=view.viewport.scale
+            val ox=view.viewport.x+view.viewport.extra/2*scale; val oy=view.viewport.y
             fun render(): Bitmap = Bitmap.createBitmap(view.width,view.height,Bitmap.Config.ARGB_8888).also { view.draw(Canvas(it)) }
             fun countDiff(a: Bitmap,b: Bitmap): Int {
                 var count=0

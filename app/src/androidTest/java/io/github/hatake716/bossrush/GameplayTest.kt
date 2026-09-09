@@ -156,12 +156,16 @@ class GameplayTest {
         assertEquals(31,read { it.selectedBoss }); screenshot("codex-odin")
     }
     private fun gesture(dx: Double,dy: Double,skill: Int,duration: Long) {
-        var width=0; var height=0
-        instrumentation.runOnMainSync { width=rule.activity.gameView.width; height=rule.activity.gameView.height }
-        val scale=min(width/960f,height/540f); val ox=(width-960*scale)/2; val oy=(height-540*scale)/2
+        lateinit var viewport: GameViewport
+        val location=IntArray(2)
+        instrumentation.runOnMainSync {
+            viewport=rule.activity.gameView.viewport; rule.activity.gameView.getLocationOnScreen(location)
+        }
         val props=Array(2) { i -> MotionEvent.PointerProperties().apply { id=i; toolType=MotionEvent.TOOL_TYPE_FINGER } }
-        fun point(x: Float,y: Float)=MotionEvent.PointerCoords().apply { this.x=ox+x*scale; this.y=oy+y*scale; pressure=1f; size=1f }
-        val coords=arrayOf(point(103f,374f),point(720f+(skill%2)*145,345f+(skill/2)*88))
+        fun point(x: Float,y: Float)=MotionEvent.PointerCoords().apply {
+            this.x=location[0]+viewport.screenX(x); this.y=location[1]+viewport.screenY(y); pressure=1f; size=1f
+        }
+        val coords=arrayOf(point(103f,374f),point(720f+viewport.extra+(skill%2)*145,345f+(skill/2)*88))
         val down=SystemClock.uptimeMillis()
         fun send(action: Int,count: Int) {
             val ev=MotionEvent.obtain(down,SystemClock.uptimeMillis(),action,count,props,coords,0,0,1f,1f,0,0,InputDevice.SOURCE_TOUCHSCREEN,0)
