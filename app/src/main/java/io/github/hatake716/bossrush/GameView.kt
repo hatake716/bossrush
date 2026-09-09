@@ -13,7 +13,7 @@ import kotlin.math.*
 data class UiButton(val label: String,val rect: RectF,val enabled: Boolean=true,val skill: Int=-1,val action: () -> Unit)
 
 class GameView(context: Context,val engine: GameEngine): View(context), Choreographer.FrameCallback {
-    val audio=Chiptune()
+    val audio=Chiptune(context)
     var hasSave=false
     var bestScore=0
     var onContinue: (() -> Unit)?=null

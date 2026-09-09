@@ -2,84 +2,70 @@ package io.github.hatake716.bossrush
 
 import org.junit.Assert.*
 import org.junit.Test
-import java.io.File
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import kotlin.math.*
 
 class MusicTest {
-    @Test fun everyThemeHasANonSilentDistinctBoundedWaveform() {
-        val signatures=mutableSetOf<Long>()
-        for(index in 0..31) {
-            var hash=7L; var energy=.0; var maximum=.0
-            for(i in 0 until 22050 step 3) {
-                val s=ScoreSynth.sample(i.toDouble()/22050,"battle",index)
-                assertTrue(s.isFinite()); maximum=max(maximum,abs(s)); energy+=s*s
-                hash=hash*31+(s*30000).roundToInt()
-            }
-            assertTrue(energy>1); assertTrue(maximum<.8); signatures.add(hash)
+    @Test fun catalogCoversEveryBossAndBothOtherScoresWithWholeThirtySecondPhrases() {
+        assertEquals(Bosses.all.map { it.id }, MusicCatalog.battles.map { it.id })
+        assertEquals(34, MusicCatalog.all.map { it.id }.toSet().size)
+        for (track in MusicCatalog.all) {
+            assertTrue("${track.id}: ${track.seconds}", track.seconds in 27.0..33.0)
+            assertEquals(0, track.bars % 4)
+            assertEquals(track.bars * track.beats * 60.0 / track.bpm, track.seconds, 1.0 / MusicCatalog.SAMPLE_RATE)
         }
-        assertEquals(32,signatures.size)
+        assertEquals(30.0, MusicCatalog.shop.seconds, .00001)
+        assertEquals(30.0, MusicCatalog.ending.seconds, .00001)
     }
-    @Test fun zunHarmonyHasMajorSixAndSevenThenMinorTonicInEverySection() {
-        for(bar in 0 until 16) {
-            val chord=BattleScore.chordAt(bar)
-            assertEquals(if(bar%4<2) 4 else 3,chord[1]-chord[0])
-            assertEquals(7,chord[2]-chord[0])
-            assertEquals(listOf(8,10,0,0)[bar%4],chord[0])
+    @Test fun zunHarmonyAndIndividualMotifsArePreserved() {
+        for (bar in 0 until 40) {
+            val chord = BattleScore.chordAt(bar)
+            assertEquals(if (bar % 4 < 2) 4 else 3, chord[1] - chord[0])
+            assertEquals(7, chord[2] - chord[0])
+            assertEquals(listOf(8, 10, 0, 0)[bar % 4], chord[0])
         }
-        assertTrue(Bosses.all.all { it.bpm in 192..232 })
-        assertEquals(Bosses.all.map { it.id },BattleScore.themes.map { it.id })
-        assertEquals(32,BattleScore.themes.map { it.phraseA to it.phraseB }.toSet().size)
-        assertEquals(3,BattleScore.themes.first { it.id=="loki" }.beats)
-        for(theme in BattleScore.themes) {
-            assertEquals(16,theme.phraseA.size); assertEquals(16,theme.phraseB.size)
-            assertEquals(theme.beats*4,theme.rhythm.length)
-        }
+        assertEquals(32, BattleScore.themes.map { it.phraseA to it.phraseB }.toSet().size)
+        assertEquals(3, MusicCatalog.battles.first { it.id == "loki" }.beats)
+        assertTrue(MusicCatalog.battles.all { it.bpm in 192..232 })
     }
-    @Test fun fullArrangementsAndLoopBoundariesStayFiniteWithHeadroom() {
-        for(index in 0..31) {
-            val duration=60.0/Bosses.all[index].bpm*BattleScore.themes[index].beats*16
-            for(frame in 0..(duration*22050).toInt() step 31) {
-                val value=ScoreSynth.sample(frame/22050.0,"battle",index)
-                assertTrue(value.isFinite()); assertTrue(abs(value)<1.0)
-            }
-            for(offset in listOf(-.00001,.0,.00001)) {
-                assertTrue(ScoreSynth.sample(duration+offset,"battle",index).isFinite())
-            }
+    @Test fun titleAndOtherSilentScreensCannotResolveAMusicTrack() {
+        for (screen in listOf("title", "jobs", "codex", "help", "gameover", "unknown")) {
+            for (boss in 0..31) assertNull(MusicCatalog.forScene(screen, boss))
         }
+        assertEquals("thor", MusicCatalog.forScene("battle", 30)?.id)
+        assertEquals("shop", MusicCatalog.forScene("shop", 31)?.id)
+        assertEquals("ending", MusicCatalog.forScene("ending", 31)?.id)
     }
-    @Test fun titleIsSilentWhileOtherScenesAndEffectsRemainAudible() {
-        for(index in 0..31) for(frame in 0..60000 step 17) {
-            assertEquals(0.0,ScoreSynth.sample(frame/1000.0,"title",index),0.0)
-        }
-        for(scene in listOf("battle","shop","ending")) {
-            var energy=0.0
-            repeat(22050) { val sample=ScoreSynth.sample(it/22050.0,scene,0); energy+=sample*sample }
-            assertTrue("$scene must remain audible",energy>1.0)
-        }
-        assertTrue(SoundEffects.clip("sword")!!.any { abs(it)>.01 })
+    @Test fun stereoLoopsHaveNoInsertedSilenceOrPositionResetOnTheSameTrack() {
+        val pcm = MusicPcm("test", shortArrayOf(10000, -5000, 20000, -10000, 15000, -7500))
+        val mixer = AudioMix(); mixer.music = pcm
+        val output = ShortArray(1024)
+        repeat(20) { mixer.render(output, true, .7) }
+        assertEquals(20 * 512 % 3, mixer.position)
+        val position = mixer.position; mixer.music = pcm; assertEquals(position, mixer.position)
+        for (i in output.indices step 2) { assertTrue(output[i] > 0); assertTrue(output[i + 1] < 0) }
+        // At full entrance gain each cycle is bit-identical, including across chunk boundaries.
+        for (i in 6 until output.size) assertEquals(output[i - 6], output[i])
     }
-    @Test fun exportOriginalMusicPreviews() {
-        val dir=File("../artifacts/music"); dir.mkdirs()
-        for((name,scene,index) in listOf(Triple("01-ratatoskr","battle",0),Triple("13-aegir","battle",12),Triple("18-hel","battle",17),Triple("30-loki","battle",29),Triple("31-thor","battle",30),Triple("32-odin","battle",31),Triple("ending","ending",31))) {
-            val length=ScoreSynth.SAMPLE_RATE*24
-            val data=ByteBuffer.allocate(44+length*2).order(ByteOrder.LITTLE_ENDIAN)
-            data.put("RIFF".toByteArray()).putInt(36+length*2).put("WAVEfmt ".toByteArray()).putInt(16).putShort(1).putShort(1)
-                .putInt(ScoreSynth.SAMPLE_RATE).putInt(ScoreSynth.SAMPLE_RATE*2).putShort(2).putShort(16).put("data".toByteArray()).putInt(length*2)
-            repeat(length) { data.putShort((ScoreSynth.sample(it.toDouble()/ScoreSynth.SAMPLE_RATE,scene,index)*18000).toInt().toShort()) }
-            File(dir,"$name.wav").writeBytes(data.array())
-            assertEquals((44+length*2).toLong(),File(dir,"$name.wav").length())
+    @Test fun muteSceneSwitchSeDuckingAndSaturationOperateOnTheActualMixer() {
+        val mixer = AudioMix(); val out = ShortArray(4096)
+        mixer.music = MusicPcm("test", ShortArray(8192) { 12000 })
+        mixer.effects.add("sword"); mixer.render(out, true, .7)
+        assertTrue(mixer.peak > 0); assertTrue(mixer.duck in .58.. .60)
+        mixer.render(out, false, .7); assertTrue(out.all { it.toInt() == 0 }); assertEquals(0, mixer.effects.voiceCount)
+        mixer.music = null; mixer.render(out, true, .7); assertTrue(out.all { it.toInt() == 0 })
+        mixer.effects.add("click"); mixer.render(out, true, .7); assertTrue(mixer.peak > 0)
+        repeat(8) { mixer.effects.add("ultimate") }
+        repeat(10) { mixer.render(out, true, 1.0); assertTrue(out.all { abs(it.toInt()) <= 30000 }) }
+        repeat(100) { mixer.render(out, true, .7) }; assertEquals(1.0, mixer.duck, .0001)
+    }
+    @Test fun combatEffectsRetainTheirDurationAndPitchAtStereoOutputRate() {
+        val base = EffectMixer(); val stereo = EffectMixer(MusicCatalog.SAMPLE_RATE)
+        base.add("sword"); stereo.add("sword")
+        val clip = SoundEffects.clip("sword")!!
+        repeat(clip.size) {
+            assertEquals(base.next(), stereo.next(), 1e-7)
+            stereo.next()
         }
-        val names=listOf("sword","knife","arrow","fire","ice","giant-hit","haniwa")
-        for(name in names) {
-            val clip=SoundEffects.clip(name)!!
-            val length=clip.size
-            val data=ByteBuffer.allocate(44+length*2).order(ByteOrder.LITTLE_ENDIAN)
-            data.put("RIFF".toByteArray()).putInt(36+length*2).put("WAVEfmt ".toByteArray()).putInt(16).putShort(1).putShort(1)
-                .putInt(ScoreSynth.SAMPLE_RATE).putInt(ScoreSynth.SAMPLE_RATE*2).putShort(2).putShort(16).put("data".toByteArray()).putInt(length*2)
-            clip.forEach { data.putShort((it*22000).toInt().toShort()) }
-            File(dir,"se-$name.wav").writeBytes(data.array())
-        }
+        assertEquals(0, base.voiceCount); assertEquals(0, stereo.voiceCount)
     }
 }

@@ -4,6 +4,7 @@ import kotlin.math.*
 
 /** Short original, material-specific chip sounds. No external audio assets. */
 object SoundEffects {
+    const val SAMPLE_RATE = 22050
     val durations=mapOf(
         "sword" to .25, "knife" to .15, "haniwa" to .29, "arrow" to .18,
         "fire" to .32, "ice" to .35, "arrow-hit" to .17, "fire-hit" to .36,
@@ -57,13 +58,14 @@ object SoundEffects {
         }
         return (sound*attack*release).coerceIn(-.95,.95)
     }
-    private val clips by lazy { durations.mapValues { (kind,duration) -> FloatArray((duration*ScoreSynth.SAMPLE_RATE).toInt()) { sample(it.toDouble()/ScoreSynth.SAMPLE_RATE,kind).toFloat() } } }
+    private val clips by lazy { durations.mapValues { (kind,duration) -> FloatArray((duration*SoundEffects.SAMPLE_RATE).toInt()) { sample(it.toDouble()/SoundEffects.SAMPLE_RATE,kind).toFloat() } } }
     fun clip(kind: String): FloatArray? = clips[kind]
 }
 
 /** Independent voices prevent simultaneous attacks, impact sounds and UI sounds cutting one another off. */
-class EffectMixer {
-    private data class Voice(val clip: FloatArray,var frame: Int=0)
+class EffectMixer(private val outputRate: Int = SoundEffects.SAMPLE_RATE) {
+    init { require(outputRate > 0) }
+    private data class Voice(val clip: FloatArray,var frame: Double=0.0)
     private val voices=mutableListOf<Voice>()
     val voiceCount get()=voices.size
     fun add(kind: String) {
@@ -75,7 +77,10 @@ class EffectMixer {
         var result=.0
         var i=voices.lastIndex
         while(i>=0) {
-            val v=voices[i]; result+=v.clip[v.frame++]
+            val v=voices[i]
+            val frame=v.frame.toInt(); val fraction=v.frame-frame
+            result+=v.clip[frame]*(1-fraction)+v.clip[min(frame+1,v.clip.lastIndex)]*fraction
+            v.frame+=SoundEffects.SAMPLE_RATE.toDouble()/outputRate
             if(v.frame>=v.clip.size) voices.removeAt(i)
             i--
         }

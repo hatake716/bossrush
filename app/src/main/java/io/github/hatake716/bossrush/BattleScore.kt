@@ -21,7 +21,7 @@ object BattleScore {
         theme("tanngrisnir","雷車の蹄を刻む二連打と低い角笛","thunder","1110111011101110","0 0 4 2 0 4 6 2 1 1 5 3 1 5 7 3","4 4 7 6 4 2 0 2 5 5 7 5 3 2 1 0"),
         theme("skoll","太陽へ駆け上がる音列と追跡の連打","hunt","1111111011111110","0 1 2 4 5 6 7 9 7 6 4 2 4 5 6 7","7 8 9 11 9 7 6 4 6 7 9 7 6 4 2 0"),
         theme("hati","月へ回り込む下降句と裏拍の追走","hunt","1011111010111110","7 6 5 4 2 1 0 2 6 5 4 2 1 0 2 4","9 7 6 4 2 4 6 7 5 4 2 1 3 2 1 0"),
-        theme("hraesvelgr","羽ばたく長い旋律と、北風のノイズ","wind","1010101110101010","0 4 7 9 7 6 4 2 1 5 8 10 8 6 5 3","7 9 11 9 7 4 2 0 6 7 9 7 5 4 2 0"),
+        theme("hraesvelgr","羽ばたく長い旋律と、北風を描く弦の残響","wind","1010101110101010","0 4 7 9 7 6 4 2 1 5 8 10 8 6 5 3","7 9 11 9 7 4 2 0 6 7 9 7 5 4 2 0"),
         theme("thjazi","急降下する翼と、奪われた春の高音","wind","1110101011101110","7 6 4 2 0 2 4 7 8 7 5 3 1 3 5 8","9 7 4 0 2 4 6 7 10 8 5 1 3 5 3 0"),
         theme("skadi","氷の短音と、矢のような高音の跳躍","ice","1011101010111010","7 4 6 2 5 1 4 0 2 5 7 6 4 2 3 1","9 6 8 4 7 3 6 2 4 7 9 7 5 3 1 0"),
         theme("ullr","弦を弾く短い音と、誓いを告げる上昇句","pluck","1010111010101110","0 2 4 7 6 4 2 1 2 4 6 9 7 6 4 2","4 7 9 11 9 7 4 2 6 9 7 6 4 3 1 0"),
@@ -46,65 +46,10 @@ object BattleScore {
         theme("thor","鎚の四分連打、二重キックと雷鳴の下降","thunder","1110111111101111","0 0 4 6 4 2 0 2 1 1 5 7 5 3 1 3","7 7 11 9 7 6 4 0 8 8 12 10 8 6 4 0"),
         theme("odin","槍の鋭い主旋律と、二羽の鴉の応答","raven","1110101110111110","0 4 6 7 9 7 4 2 1 5 7 8 10 8 5 3","7 11 9 7 6 4 2 0 5 9 7 5 4 2 1 0")
     )
-    private val minor = intArrayOf(0,2,3,5,7,8,10)
     fun chordAt(bar: Int): List<Int> = when(Math.floorMod(bar,4)) {
         0 -> listOf(8,12,15) // bVI major
         1 -> listOf(10,14,17) // bVII major
         else -> listOf(0,3,7) // i minor (two bars)
-    }
-    private fun degree(n: Int) = Math.floorDiv(n,7)*12+minor[Math.floorMod(n,7)]
-    private data class Step(val lead: Double,val arp: Double,val bass: Double,val counter: Double,val on: Boolean,val kick: Double,val snare: Double)
-    private data class Arrangement(val theme: BattleTheme,val duration: Double,val steps: List<Step>) {
-        val gate=if(theme.voice in listOf("ice","pluck","spark")) .73 else .91
-        val counter=theme.voice in listOf("echo","raven","dual")
-    }
-    private val scores by lazy {
-        themes.mapIndexed { index,t ->
-            check(t.id==Bosses.all[index].id)
-            val root=Bosses.all[index].root
-            val melodyRoot=root+if(root<58) 12 else 0
-            val count=t.beats*4
-            val steps=(0 until count*16).map { s ->
-                val bar=s/count; val beat=s%count; val section=bar/4
-                val phrase=if(section%2==0) t.phraseA else t.phraseB
-                val motif=phrase[(s/2)%phrase.size]
-                var note=degree(motif)+t.register
-                val chord=chordAt(bar)
-                // Strong melody beats resolve into the CURRENT chord, not a parallel minor chord.
-                if(beat%4==0) note=(-24..48).filter { Math.floorMod(it,12) in chord.map { n -> n%12 } }.minBy { abs(it-note) }
-                if(section==2) note+=12
-                if(t.voice=="dual" && bar%2==1) note-=12
-                val flourish=if(beat%2==1 && t.rhythm[beat%t.rhythm.length]=='1') 2 else 0
-                val arpOrder=if(t.voice=="sea") intArrayOf(0,1,2,1) else intArrayOf(0,2,1,2)
-                val arp=chord[arpOrder[beat%4]]+if(beat%8>=4) 12 else 0
-                val bass=chord[0]+if(beat%4==2) 12 else 0
-                val previous=degree(phrase[Math.floorMod(s/2-2,phrase.size)])
-                val kick=when { beat%4==0 -> 1.0; t.voice in listOf("thunder","hunt","fire") && beat%4==2 -> .72; t.voice=="stone" && beat%3==0 -> .9; else -> .0 }
-                val snare=if((t.beats==3 && beat==8) || (t.beats==4 && beat%8==4)) 1.0 else if(bar%4==3 && beat>=count-3) .7 else .0
-                Step(hz(melodyRoot+note+flourish),hz(root-12+arp),hz(root-24+bass),hz(melodyRoot+previous-12),t.rhythm[beat%t.rhythm.length]=='1',kick,snare)
-            }
-            Arrangement(t,60.0/Bosses.all[index].bpm/4,steps)
-        }
-    }
-    private val arpDuty=.25
-    private fun hz(note: Int)=440*2.0.pow((note-69)/12.0)
-    fun sample(time: Double,index: Int): Double {
-        val a=scores[index.coerceIn(0,31)]; val step=(time/a.duration).toLong(); val s=a.steps[(step%a.steps.size).toInt()]
-        val local=time%a.duration; val phase=local/a.duration; val voice=a.theme.voice
-        val gate=a.gate
-        val env=if(phase>gate) .0 else min(1.0,local/.003)*min(1.0,(gate-phase)/.12)
-        val duty=when(voice) { "horn","thunder","stone" -> .5; "spark","ice","raven" -> .125; "trick" -> if(step/12%2==0L) .125 else .5; else -> .25 }
-        val lead=if(s.on) AudioMath.pulse(time,s.lead*(1+.002*sin(time*34)),duty)*env*.23 else .0
-        val arp=AudioMath.pulse(time,s.arp,arpDuty)*env*.10
-        val bass=AudioMath.triangle(time,s.bass)*min(1.0,local/.002)*(1-phase*.65)*.22
-        val counter=if(a.counter || step/(a.theme.beats*4)%16>=8) AudioMath.pulse(time,s.counter,.25)*env*.065 else .0
-        val noise=AudioMath.noise(time)
-        val kick=sin(2*PI*(53*local+2.8*(1-exp(-local*55))))*exp(-local*27)*s.kick*.31
-        val snare=(noise*.73+sin(2*PI*175*local)*.27)*exp(-local*42)*s.snare*.25
-        val hat=noise*exp(-local*190)*(if(step%2==0L) .065 else .10)
-        val crash=if(step%(a.theme.beats*16)==0L) noise*exp(-local*17)*.12 else .0
-        val breath=if(voice=="wind" || voice=="fire") noise*env*.022 else .0
-        return (lead+arp+bass+counter+kick+snare+hat+crash+breath)*min(1.0,time*25)
     }
 }
 
