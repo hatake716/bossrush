@@ -112,15 +112,68 @@ class GameEngineTest {
     @Test fun fortuneTriplesOnlyThisBossAndThiefGetsMoreGold() {
         val e=battle(Job.THIEF); e.fortune=true; e.victory(); assertEquals(288,e.lastGold)
         assertFalse(e.lootChosen); assertTrue(e.chooseLoot(Item.HOURGLASS))
-        assertTrue(e.upgrade(0)); e.finishReward(); e.leaveShop(); e.beginBattle()
+        assertTrue(e.selectUpgrade(0)); e.finishReward(); e.leaveShop(); e.beginBattle()
         assertFalse(e.fortune); assertFalse(e.stolen)
     }
     @Test fun exactlyOneUpgradeAndFullInventoryReplacementAreRequired() {
         val e=battle(Job.THIEF); e.run!!.inventory.clear(); repeat(5) { e.run!!.inventory.add(Item.POTION) }; e.victory()
-        assertTrue(e.upgrade(1)); assertFalse(e.upgrade(0)); assertEquals(2,e.levels[1])
+        assertTrue(e.selectUpgrade(0)); assertTrue(e.selectUpgrade(1)); assertEquals(1,e.levels[1])
         assertFalse(e.chooseLoot(Item.CLONES)); e.finishReward(); assertEquals(Screen.REWARD,e.screen)
         assertTrue(e.replaceLoot(2)); e.finishReward(); assertEquals(Screen.SHOP,e.screen)
+        assertArrayEquals(intArrayOf(1,2,1,1),e.levels)
         assertEquals(Item.CLONES,e.run!!.inventory[2]); assertEquals(5,e.run!!.inventory.size)
+    }
+    @Test fun upgradeSelectionCanBeChangedAndCancelledWithoutMutatingStatsOrSaving() {
+        for(job in Job.entries) {
+            val e=battle(job); e.victory(); var saves=0; e.onCheckpoint={ saves++ }
+            val power=e.power(0); val original=e.levels.copyOf()
+            for(slot in 0..3) {
+                assertTrue(e.selectUpgrade(slot)); assertEquals(slot,e.pendingUpgrade)
+                assertArrayEquals(original,e.levels); assertEquals(power,e.power(0),.0)
+                assertTrue(e.selectUpgrade(slot)); assertArrayEquals(original,e.levels)
+            }
+            assertTrue(e.cancelUpgrade()); assertEquals(-1,e.pendingUpgrade)
+            assertFalse(e.cancelUpgrade()); assertFalse(e.canFinishReward)
+            e.finishReward(); assertEquals(Screen.REWARD,e.screen)
+            assertArrayEquals(original,e.levels); assertEquals(0,saves)
+        }
+    }
+    @Test fun confirmingAnUpgradeAppliesItExactlyOnceBeforeTheCheckpointAndHonorsTheCap() {
+        val e=battle(); e.victory(); e.levels[0]=16; e.levels[1]=15
+        assertTrue(e.selectUpgrade(1))
+        for(slot in listOf(-1,0,4)) assertFalse(e.selectUpgrade(slot))
+        assertEquals(1,e.pendingUpgrade); assertEquals(15,e.levels[1])
+        var saves=0; e.onCheckpoint={
+            assertEquals(Screen.SHOP,e.screen); assertEquals(1,e.run!!.stage)
+            assertArrayEquals(intArrayOf(16,16,1,1),e.levels); saves++
+        }
+        assertTrue(e.canFinishReward); e.finishReward()
+        e.finishReward(); assertFalse(e.selectUpgrade(2)); assertFalse(e.cancelUpgrade())
+        assertEquals(-1,e.pendingUpgrade); assertEquals(1,saves); assertEquals(1,e.run!!.stage)
+    }
+    @Test fun cancellingGrowthDoesNotLoseThiefLootAndAnUnfinishedLootChoiceCannotCommitGrowth() {
+        val e=battle(Job.THIEF); e.run!!.inventory.apply { clear(); repeat(5) { add(Item.POTION) } }; e.victory()
+        e.selectUpgrade(0); assertFalse(e.chooseLoot(Item.CLONES)); e.finishReward()
+        assertEquals(Screen.REWARD,e.screen); assertEquals(1,e.levels[0])
+        assertTrue(e.cancelUpgrade()); assertEquals(Item.CLONES,e.pendingLoot)
+        assertTrue(e.replaceLoot(3)); assertFalse(e.canFinishReward)
+        e.selectUpgrade(2); assertTrue(e.cancelUpgrade()); assertTrue(e.lootChosen)
+        e.selectUpgrade(1); e.finishReward()
+        assertArrayEquals(intArrayOf(1,2,1,1),e.levels)
+        assertEquals(Item.CLONES,e.run!!.inventory[3]); assertEquals(5,e.run!!.inventory.size)
+    }
+    @Test fun cancellingTheFinalUpgradeDelaysEndingAndDraftsDoNotSurviveResumeOrANewBattle() {
+        val e=battle(stage=31); e.victory(); var results=0
+        e.onResult={ _,clear -> assertTrue(clear); assertEquals(2,e.levels[3]); results++ }
+        e.selectUpgrade(0); e.cancelUpgrade(); e.finishReward()
+        assertEquals(Screen.REWARD,e.screen); assertEquals(0,results)
+        e.selectUpgrade(3); e.finishReward(); e.finishReward()
+        assertEquals(Screen.ENDING,e.screen); assertEquals(1,results)
+        val resumed=battle(); resumed.victory(); resumed.selectUpgrade(1); resumed.resumeRun()
+        assertEquals(-1,resumed.pendingUpgrade); assertArrayEquals(intArrayOf(1,1,1,1),resumed.levels)
+        resumed.beginBattle(); resumed.victory(); resumed.selectUpgrade(2); resumed.beginBattle()
+        assertEquals(-1,resumed.pendingUpgrade)
+        resumed.victory(); resumed.selectUpgrade(3); resumed.newRun(); assertEquals(-1,resumed.pendingUpgrade)
     }
     @Test fun scoresRewardBothSpeedAndAvoidingDamage() {
         assertTrue(GameEngine.scoreFor(25.0,10.0)>GameEngine.scoreFor(35.0,10.0))
@@ -157,7 +210,7 @@ class GameEngineTest {
                 e.beginBattle(); assertEquals(stage,e.run!!.stage)
                 e.elapsed=30.0; e.ultimateUsed=true; e.damageBoss(e.boss.maxHp)
                 assertEquals(Screen.REWARD,e.screen)
-                val slot=e.levels.indices.first { e.levels[it]<16 }; assertTrue(e.upgrade(slot))
+                val slot=e.levels.indices.first { e.levels[it]<16 }; assertTrue(e.selectUpgrade(slot))
                 if(job==Job.THIEF) {
                     if(e.run!!.inventory.size>=5) e.run!!.inventory.removeAt(0)
                     assertTrue(e.chooseLoot(Item.INVISIBLE))

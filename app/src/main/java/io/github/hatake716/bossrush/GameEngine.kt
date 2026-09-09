@@ -102,7 +102,9 @@ class GameEngine(random: Random=Random.Default) {
     var lastGold = 0
     var lastTime = 0.0
     var lastDamage = 0.0
-    var rewardChosen = false
+    var pendingUpgrade = -1
+        private set
+    val canFinishReward get()=screen==Screen.REWARD && pendingUpgrade in 0..3 && levels[pendingUpgrade]<16 && lootChosen
     var lootChosen = false
     var stolen = false
     var pendingLoot: Item? = null
@@ -119,11 +121,12 @@ class GameEngine(random: Random=Random.Default) {
     fun changeScreen(value: Screen) { if(value in listOf(Screen.TITLE,Screen.REWARD,Screen.GAMEOVER,Screen.ENDING)) bossMove=null; screen=value; screenAge=0.0; heldSkill=-1; moveX=0.0; moveY=0.0 }
     fun newRun() {
         run = Run(selectedJob); resultRecorded=false; finalEnding=false
+        pendingUpgrade=-1
         changeScreen(Screen.INTRO); onCheckpoint?.invoke()
     }
     fun resumeRun() {
         val r = run ?: return
-        rewardChosen = r.checkpoint == "SHOP"
+        pendingUpgrade=-1
         lootChosen = true
         changeScreen(if (r.checkpoint == "SHOP") Screen.SHOP else Screen.INTRO)
     }
@@ -138,7 +141,7 @@ class GameEngine(random: Random=Random.Default) {
         elapsed=0.0; damageTaken=0.0; damageDone=0.0; restTime=0.0; invulnerability=0.0
         ultimateUsed=false; ultimateCount=0; cutinTime=0.0; patternNumber=0; nextPattern=1.6*BossTiming.SCALE
         message="予兆の外へ移動。技を押して攻撃！"; messageTime=4.0
-        rewardChosen=false; lootChosen=false; stolen=false; pendingLoot=null; fortune=false
+        pendingUpgrade=-1; lootChosen=false; stolen=false; pendingLoot=null; fortune=false
         castName=""; castEnd=0.0; castDuration=0.0; selectedItem=-1
         if (!reference) {
             val hp = max(estimateHp(r), r.previousHp * 1.025).roundToInt().toDouble()
@@ -625,13 +628,17 @@ class GameEngine(random: Random=Random.Default) {
         lastScore=scoreFor(elapsed,damageTaken)
         lastGold=((60+r.stage*8)*(if(job==Job.THIEF) 1.6 else 1.0)*(if(fortune) 3 else 1)).roundToInt()
         r.score+=lastScore; r.gold+=lastGold; r.kills++; r.totalTime+=elapsed; r.totalDamage+=damageTaken; r.previousHp=boss.maxHp
-        rewardChosen=false; lootChosen=job!=Job.THIEF; finalEnding=r.stage==31
+        pendingUpgrade=-1; lootChosen=job!=Job.THIEF; finalEnding=r.stage==31
         // Rewards remain an atomic checkpoint: reloading before choosing restarts this battle.
         changeScreen(Screen.REWARD); sounds.add("victory")
     }
-    fun upgrade(slot: Int): Boolean {
-        if(screen!=Screen.REWARD || rewardChosen || slot !in 0..3 || levels[slot]>=16) return false
-        levels[slot]++; rewardChosen=true; sounds.add("buff"); return true
+    fun selectUpgrade(slot: Int): Boolean {
+        if(screen!=Screen.REWARD || slot !in 0..3 || levels[slot]>=16) return false
+        pendingUpgrade=slot; return true
+    }
+    fun cancelUpgrade(): Boolean {
+        if(screen!=Screen.REWARD || pendingUpgrade<0) return false
+        pendingUpgrade=-1; return true
     }
     fun chooseLoot(item: Item): Boolean {
         val r=run ?: return false
@@ -645,7 +652,9 @@ class GameEngine(random: Random=Random.Default) {
         r.inventory[index]=item; pendingLoot=null; lootChosen=true; return true
     }
     fun finishReward() {
-        if(!rewardChosen || !lootChosen) return
+        if(!canFinishReward) return
+        // Apply only when leaving the reward screen, before saving the next checkpoint.
+        levels[pendingUpgrade]++; pendingUpgrade=-1; sounds.add("buff")
         if(finalEnding) { changeScreen(Screen.ENDING); recordResult(true) }
         else {
             run!!.stage++; run!!.checkpoint="SHOP"; changeScreen(Screen.SHOP); onCheckpoint?.invoke()

@@ -129,7 +129,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             Screen.PAUSED -> engine.unpause()
             Screen.CODEX,Screen.HELP -> engine.changeScreen(returnScreen)
             Screen.JOBS,Screen.INTRO,Screen.SHOP,Screen.GAMEOVER,Screen.ENDING -> engine.changeScreen(Screen.TITLE)
-            Screen.REWARD -> Unit
+            Screen.REWARD -> engine.cancelUpgrade()
             else -> (context as? android.app.Activity)?.moveTaskToBack(true)
         }
     }
@@ -471,16 +471,18 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         text(c,"%.1f秒  /  被ダメージ %.0f  /  +%d G".format(java.util.Locale.ROOT,e.lastTime,e.lastDamage,e.lastGold),37f,165f,16f)
         pixel(c,"+${e.lastScore}",704f+extra,105f,3.4f,Ink.light)
         val thief=e.job==Job.THIEF
-        text(c,if(e.rewardChosen) "技を強化しました" else "強化する技を1つ選択",37f,202f,19f)
+        text(c,if(e.pendingUpgrade>=0) "${Skills.all.getValue(e.job)[e.pendingUpgrade].name}を選択中・まだ確定していません" else "強化する技を1つ選択",37f,202f,19f)
         Skills.all.getValue(e.job).forEachIndexed { i,s ->
             val x=36f+i*(226+extra/3); val y=221f
-            rect(c,x,y,211f,if(thief) 113f else 157f,Ink.deep); border(c,x,y,211f,if(thief) 113f else 157f)
+            val selected=e.pendingUpgrade==i
+            rect(c,x,y,211f,if(thief) 113f else 157f,if(selected) Ink.dark else Ink.deep)
+            border(c,x,y,211f,if(thief) 113f else 157f,if(selected) Ink.light else Ink.mid,if(selected) 3f else 2f)
             art.icon(c,s.glyph,x+14,y+17,2f)
             text(c,s.name,x+62,y+36,15f)
-            text(c,if(e.rewardChosen) "Lv.${e.levels[i]}" else if(e.levels[i]>=16) "Lv.16 MAX" else "Lv.${e.levels[i]} → ${e.levels[i]+1}",x+16,y+70,20f)
-            text(c,Skills.detail(e.job,i,e.levels[i]),x+16,y+99,11f,Ink.mid)
+            text(c,if(e.levels[i]>=16) "Lv.16 MAX" else "Lv.${e.levels[i]} → ${e.levels[i]+1}",x+16,y+70,20f)
+            text(c,Skills.detail(e.job,i,e.levels[i]+if(selected) 1 else 0),x+16,y+99,11f,Ink.mid)
             if(!thief) wrap(c,s.description,x+16,y+123,178f,12f,Ink.mid,19f)
-            buttons.add(UiButton("${s.name}を強化",RectF(x,y,x+211,y+(if(thief) 113 else 157)),!e.rewardChosen&&e.levels[i]<16) { e.upgrade(i) })
+            buttons.add(UiButton("${s.name}を選択",RectF(x,y,x+211,y+(if(thief) 113 else 157)),e.levels[i]<16) { e.selectUpgrade(i) })
         }
         if(thief) {
             text(c,if(e.lootChosen) "特殊アイテムを獲得しました" else "盗賊の戦利品：4つから1つ選ぶ",37f,364f,16f)
@@ -497,8 +499,9 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             text(c,"威力・効果はLv.1で最大の25%。Lv.16まで直線的に成長。",37f,421f,14f,Ink.mid)
             text(c,"範囲も拡大し、待機時間も短くなります。",37f,447f,14f,Ink.mid)
         }
-        button(c,if(e.run!!.stage==31) "夜明けへ  →" else "旅の商人へ  →",674f+extra,476f,250f,45f,true,e.rewardChosen&&e.lootChosen) { e.finishReward() }
-        pixel(c,"ONE STEP CLOSER TO DAWN",37f,491f,1.4f,Ink.mid)
+        button(c,"技の選択をキャンセル",36f,476f,211f,45f,enabled=e.pendingUpgrade>=0) { e.cancelUpgrade() }
+        text(c,"進むと強化が確定します",278f,504f,14f,Ink.mid)
+        button(c,if(e.run!!.stage==31) "夜明けへ  →" else "旅の商人へ  →",674f+extra,476f,250f,45f,true,e.canFinishReward) { e.finishReward() }
     }
     private fun shop(c: Canvas) {
         val e=engine; val r=e.run!!
@@ -594,7 +597,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             "01  接続と移動" to "AndroidにBluetoothまたはUSBで接続して操作。左スティック／十字キーで移動します。スティックは倒し具合で速度が変わります。",
             "02  4つの技" to "A＝技1、B＝技2、X＝技3、Y＝技4。押し続けると連続使用。ボタンの配置は機種で異なるので、戦闘画面のA・B・X・Y表示を確認しましょう。",
             "03  アイテム" to "L1／R1でかばんの選択枠を移動。L2で時間を止めて効果を確認。Aで使用、Bでキャンセルします。何度も押しても一度に1個だけ使います。",
-            "04  メニューと一時停止" to "左スティック／十字キーで白い選択枠を移動、Aで決定、Bで戻ります。STARTで一時停止／再開。職業選択や買い物も同じ操作です。",
+            "04  メニューと一時停止" to "左スティック／十字キーで白い選択枠を移動、Aで決定、Bで戻ります。強化画面ではBで選択を取消。STARTで一時停止／再開します。",
             "05  ボタン表記" to "A／B／X／YはAndroidの標準ボタン名です。L1・R1は上側の肩ボタン、L2は左トリガー。確認ダイアログ内の選択には十字キーを使います。",
             "06  安心して再開" to "操作中のコントローラーが切断されると戦闘を一時停止します。再接続してSTARTで再開。タッチ操作にもいつでも切り替えられます。"
         ) else listOf(
@@ -602,7 +605,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             "02  予兆を読む" to "斜線は危険地帯。突進は帯の横へ、飛び込みは着地点の円の外へ。輪・月印・白いルーンは内側へ。吹き飛ばしは中央へ。前後攻撃は切り返します。",
             "03  技と召喚" to "技にはゲージと待機時間が必要。召喚士は回復速度が半分で仲間は2体まで。はにわは正面を守り、再タップすると近接攻撃します。",
             "04  休むとアイテム" to "休むと2秒間動けず、その後に回復。下のアイテムを選ぶと時間が止まり、効果を確認して使えます。かばんは特殊アイテムを含めて5個まで。",
-            "05  成長と保存" to "撃破後に技を1つ強化。Lv.16が最大。盗賊は特殊品も1つ選べます。戦闘前と買い物後に自動保存。敗北で冒険終了、最高スコアは残ります。",
+            "05  成長と保存" to "撃破後に技を1つ選択。キャンセル・選び直しができ、次へ進むと確定します。Lv.16が最大。盗賊は特殊品も選択。戦闘前と買い物後に自動保存。",
             "06  高いスコアへ" to "素早く倒し、被ダメージを減らすと高得点。全32体を越えると世界に色が戻ります。物理キー：WASD/矢印で移動、1〜4で技、Escで一時停止。"
         )
         topics.forEachIndexed { i,pair ->

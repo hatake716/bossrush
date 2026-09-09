@@ -1,10 +1,12 @@
-# BOSSRUSH 1.0.9 検証記録
+# BOSSRUSH 1.0.10 検証記録
 
-検証日：2026-09-09。Android 8.0以上、applicationId `io.github.hatake716.bossrush`、versionName `1.0.9`、versionCode `10`。
+検証日：2026-09-09。Android 8.0以上、applicationId `io.github.hatake716.bossrush`、versionName `1.0.10`、versionCode `11`。
 
-## 変更内容
+## 修正内容
 
-32体すべてに突進・飛び込み・回り込み・瞬間移動のいずれかを行う通常技を追加し、必殺技にも移動を組み込みました。攻撃の合間にも位置を変えます。移動経路と予兆の時計を共有し、突進の接触、着地と範囲攻撃、移動先からの照準、矢・炎の命中を実際のボス座標に合わせています。残像、土煙、ジャンプの高さ・影、転移ルーンを描画します。[全32体の仕様](COMBAT.md)。
+戦闘後に技を選ぶと即座にレベルが上がり、選択をキャンセルできない不具合を修正しました。技の選択を仮状態にし、別の技への選び直し、「技の選択をキャンセル」、Androidの「戻る」、コントローラーのB／キーボードのEscで取り消せます。選択中の枠と強化後の効果をプレビューし、「旅の商人へ」（最終戦は「夜明けへ」）で選んだ技だけを1レベル上げます。
+
+確定前は実際のレベル・威力・保存データを変更しません。確定は保存・結果通知より先に行い、連打で二重加算しないようにしています。盗賊の戦利品と技の仮選択を分け、技を取り消しても受け取ったアイテムや交換待ちのアイテムを失いません。Lv.16の技は選択できません。[操作方法](CONTROLS.md)。
 
 ## ビルドと単体テスト
 
@@ -12,60 +14,58 @@
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease assembleDebugAndroidTest
 ```
 
-- ビルド成功。Debug APKとR8最適化・リソース縮小を含む未署名Release APKを生成。
-- 単体テスト：**61件成功、失敗0件**。追加した移動専用テスト8件を含みます。
-- 全32体の移動、経路固定、移動後の照準、画面端、突進の予兆と接触・1回限りの判定、着地、一時停止、矢の交差、瞬間移動中の誤命中防止、カットイン・勝利時の取り消し、二重詠唱との同期を検査。
-- 全32体の通常技・必殺技の安全地点、HP1/2と1/4の移行、ランダムな連戦進行、4職業・30秒試算、タイトルの無音と戦闘曲・SE、入力・保存の既存検査も成功。
-- Lint Debug：**エラー0、警告27**。CanvasのKTX拡張への置換提案2件が増えています。
-- 39体のキャラクターPNGと33背景PNGの検査成功。
-- Debug APK：既存と同じ署名証明書、16 KB zipalignの検証成功。
+- Debug／Release／AndroidテストAPKのビルド成功。ReleaseはR8最適化・リソース縮小を含む未署名APK。
+- 単体テスト：**65件成功、失敗0件**。追加した4件は、4職業での選択・再選択・取消、確定と保存の順番・二重加算防止・Lv.16上限、盗賊の戦利品との独立、最終戦での確定と仮選択の初期化を検査。
+- 32戦の進行、ボス移動、攻撃・回避・音楽・入力など、既存の単体テストも成功。
+- Lint Debug：**エラー0、警告27**。
+- 既存と同じDebug署名証明書と16 KB zipalignを確認。
 - `git diff --check` とローカルMarkdownリンクの確認成功。
 
 ## エミュレーター
 
-API 35 / x86_64、`emulator-5554`。**操作・描画の19項目すべてについて成功を確認**しました。
-
-最初に `tools/test-emulator.sh emulator-5554` を実行し、既存18項目が成功しました（全体 234.015 秒）。追加した移動描画テスト1項目では、突進終了から0.10秒後の画像にも位置が完全一致することを要求していましたが、実装ではその間に次の位置取りが始まります。終了直後の移動可能距離を含む確認へテストの期待値を修正し、その1項目だけを再実行して成功しました（24.756 秒）。着地・突進終了時点の座標一致は単体テストで別途検査しています。
+API 35 / x86_64、対象 `emulator-5554`。今回の変更に関連する **11件が成功、失敗0件、204.266秒**。
 
 ```sh
 adb -s emulator-5554 shell am instrument -w -r \
-  -e class io.github.hatake716.bossrush.BossMovementRenderTest \
+  -e class io.github.hatake716.bossrush.GameplayTest,io.github.hatake716.bossrush.ControllerTest,io.github.hatake716.bossrush.FullscreenTest \
   io.github.hatake716.bossrush.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
-再実行の前後でアプリ本体のAPKは同一です。変更したのはテストAPKだけです。結果を `artifacts/delivery/movement-tests.json` に集約しています。
+- **GameplayTest：5件**。追加した回帰テストでは全4職業で、技の選択、別の技への変更、キャンセルボタン、Androidの「戻る」、確定、Activity再起動後の保存復元を確認。報酬画面の準備にはテスト用の撃破状態を使っています。
+- 既存のタッチ操作では戦士で最初のボスを撃破し、強化・買い物・保存再開まで確認。4職業の操作、バックグラウンド停止・復帰、図鑑、盗賊の戦利品とエンディングも確認。終盤はテスト用状態を使用。
+- **ControllerTest：4件**。仮選択でレベルが変わらず、同じ技でAを再度押しても確定されないこと、Bで取り消せること、別の技を選んで商人へ進むとその技だけが強化されることを確認。既存の戦闘・メニュー・アイテム操作も成功。
+- **FullscreenTest：2件**。各画面比率、左右のカメラ穴、画面端のボタンの表示・操作を確認。
+- 戦士・盗賊の選択中の画面を目視し、枠・未確定表示・取消ボタンに重なりや見切れがないことを確認。
 
-- **実際のAndroid入力**：戦士でタイトルから出発、移動する最初のボスを撃破、カットイン、技の強化、購入、Activity終了と保存再開。4職業の操作とバックグラウンド停止・復帰。
-- **コントローラー入力**：冒険開始、移動、技、アイテム、メニュー、一時停止、解除と再開。物理ゲームパッドの接続試験とは区別しています。
-- **描画用の状態**：全32ボスの通常攻撃・必殺技・カットイン・二重詠唱、キャラクター・背景、各画面比率、左右のカメラ穴を確認。
-- **移動の連続フレーム**：グリンブルスティ、トール、スカジ、ロキを実際のGameEngineで進行させ、各60枚を出力。移動距離、足元マーカーの視認性、移動後の位置を検査。4段階の画像を目視確認。
-- 盗賊の報酬、終盤・エンディング・最高スコアにはテスト用状態を使用。32体を人間が通しプレイした記録ではありません。
+今回の操作テストはエミュレーター上のAndroid入力です。物理ゲームパッドの接続試験とは区別しています。キャラクター・背景・戦闘エフェクト専用のAndroidテストは再実行していません。[1.0.9の描画・戦闘検証](https://github.com/hatake716/bossrush/blob/75abec8c6e8b245a2a25aa1013fa816e1c198be1/docs/VALIDATION.md)も参照してください。
 
-ログ：`artifacts/instrumentation.txt`（最初の実行）、`artifacts/instrumentation-movement.txt`（修正した1項目の再検証）。描画フレームは `artifacts/screenshots/motion-*.png`。比較動画 `artifacts/delivery/boss-movement-preview.mp4` は4種類のテスト用フレームを30 fpsで並べたものです。
+ログ：`artifacts/instrumentation-reward.txt`。4職業の取消前後の画像：`artifacts/screenshots/growth-*.png`。
 
-![予兆・開始・移動中・終了の4段階](screenshots/boss-movement-storyboard.png)
+![技を仮選択した状態。まだレベルは変わっていません](screenshots/growth-selected-WARRIOR.png)
+
+![キャンセル後。選び直すまで次へ進むボタンは無効です](screenshots/growth-cancelled-WARRIOR.png)
 
 ## Pixel 10aへの更新
 
-エミュレーターで検証したAPKを `adb install --no-incremental -r` で **1.0.8から1.0.9へ更新**しました。
+エミュレーターで検証したAPKを `adb install --no-incremental -r` で **1.0.9から1.0.10へ更新**しました。
 
 - インストール：`Success`。
-- 起動：`Status: ok`、583 ms。前面Activityとプロセス生存を確認。
-- versionName `1.0.9` / versionCode `10` を確認。
+- 起動：`Status: ok`、534 ms。前面Activityとプロセス生存を確認。
+- versionName `1.0.10` / versionCode `11` を確認。
 - SharedPreferencesの更新前後のSHA-256が一致。既存の保存データを維持。
 - 実機・検証したエミュレーター・引き渡しAPKのSHA-256が一致。
 - 確認時点のアプリプロセスにクラッシュ・ANRのログなし。
-- 物理端末へのタップ・スワイプ・キーの入力注入なし。実機の操作感はユーザーによるプレイ確認と区別しています。
+- 物理端末へのタップ・スワイプ・キー入力の注入なし。実機では更新と起動を確認し、操作はエミュレーターで検証しています。
 
-証跡：`artifacts/delivery/physical-install-1.0.9.json`。
+証跡：`artifacts/delivery/physical-install-1.0.10.json`。
 
 ## 引き渡しAPK
 
-`artifacts/delivery/BOSSRUSH-1.0.9-debug.apk`
+`artifacts/delivery/BOSSRUSH-1.0.10-debug.apk`
 
 ```text
-サイズ：154,527,388 bytes（約147.37 MiB）
-SHA-256：a96f34767f17eefe8b9d8e54dfd46fe51293b48de53dbdf03541ad274efd5d59
+サイズ：154,528,138 bytes（約147.37 MiB）
+SHA-256：70e5c8d27b48ade49fe7cc6dcc344419593bf047950970d38f8fedf11c3435c5
 署名：Android Debug
 署名証明書 SHA-256：2c53b411c1193758289715cc230989564a571259b2eb4f5702b774c07a515e87
 zipalign -c -P 16 4：成功

@@ -117,7 +117,8 @@ class GameplayTest {
         }
         assertEquals(Screen.REWARD,read { it.screen }); assertTrue(cutinSeen)
         assertEquals(1,read { it.run!!.kills }); screenshot("victory")
-        tap("剣を強化"); assertEquals(2,read { it.levels[0] }); tap("旅の商人へ  →")
+        tap("剣を選択"); assertEquals(1,read { it.levels[0] }); tap("旅の商人へ  →")
+        assertEquals(2,read { it.levels[0] })
         val beforeGold=read { it.run!!.gold }; val stock=read { it.run!!.inventory.size }
         tap("35 G  購入")
         assertEquals(beforeGold-35,read { it.run!!.gold }); assertEquals(stock+1,read { it.run!!.inventory.size })
@@ -125,6 +126,30 @@ class GameplayTest {
         rule.finishActivity(); rule.launchActivity(Intent()); tap("つづきから")
         assertEquals(Screen.SHOP,read { it.screen }); assertEquals(2,read { it.levels[0] }); assertEquals(1,read { it.run!!.stage })
         assertEquals(beforeGold-35,read { it.run!!.gold }); tap("次のボスへ  →"); screenshot("second-boss")
+    }
+    @Test fun fixtureUpgradeSelectionCanBeCancelledChangedAndSavedForEveryJob() {
+        for(job in Job.entries) {
+            if(job!=Job.WARRIOR) { rule.finishActivity(); launch() }
+            start(job)
+            instrumentation.runOnMainSync { rule.activity.gameView.engine.victory() }
+            assertNotNull(device.wait(Until.findObject(By.desc("${Skills.all.getValue(job)[0].name}を選択")),5000))
+            val names=Skills.all.getValue(job).map { "${it.name}を選択" }
+            tap(names[0]); assertEquals(0,read { it.pendingUpgrade })
+            tap(names[1]); assertEquals(1,read { it.pendingUpgrade })
+            assertEquals(listOf(1,1,1,1),read { it.levels.toList() })
+            screenshot("growth-selected-${job.name}")
+            tap("技の選択をキャンセル"); assertEquals(-1,read { it.pendingUpgrade })
+            assertFalse(read { it.canFinishReward })
+            tap(names[2]); device.pressBack(); SystemClock.sleep(150)
+            assertEquals(Screen.REWARD,read { it.screen }); assertEquals(-1,read { it.pendingUpgrade })
+            screenshot("growth-cancelled-${job.name}")
+            if(job==Job.THIEF) tap("三影の鏡")
+            tap(names[3]); tap("旅の商人へ  →")
+            assertEquals(Screen.SHOP,read { it.screen }); assertEquals(listOf(1,1,1,2),read { it.levels.toList() })
+            rule.finishActivity(); rule.launchActivity(Intent()); tap("つづきから")
+            assertEquals(Screen.SHOP,read { it.screen }); assertEquals(1,read { it.run!!.stage })
+            assertEquals(listOf(1,1,1,2),read { it.levels.toList() })
+        }
     }
     @Test fun fixtureThiefRewardReplacementAndColorEndingRenderCorrectly() {
         start(Job.THIEF)
@@ -134,14 +159,14 @@ class GameplayTest {
             e.run!!.inventory.clear(); repeat(5) { e.run!!.inventory.add(Item.POTION) }
             e.elapsed=30.0; e.victory()
         }
-        SystemClock.sleep(150); tap("ナイフを強化"); tap("時戻しの砂時計")
+        SystemClock.sleep(150); tap("ナイフを選択"); tap("時戻しの砂時計")
         tap("薬草のしずく"); assertTrue(read { it.run!!.inventory.contains(Item.HOURGLASS) })
         screenshot("thief-reward"); tap("旅の商人へ  →")
         instrumentation.runOnMainSync {
             val e=rule.activity.gameView.engine
             e.run!!.stage=31; e.run!!.kills=31; e.run!!.inventory.clear(); e.beginBattle(); e.elapsed=30.0; e.victory()
         }
-        SystemClock.sleep(150); tap("ナイフを強化"); tap("三影の鏡"); tap("夜明けへ  →")
+        SystemClock.sleep(150); tap("ナイフを選択"); tap("三影の鏡"); tap("夜明けへ  →")
         assertEquals(Screen.ENDING,read { it.screen }); screenshot("ending-fixture")
         val bitmap=instrumentation.uiAutomation.takeScreenshot(); var colorful=0
         for(x in 0 until bitmap.width step 10) for(y in 0 until bitmap.height step 10) {
