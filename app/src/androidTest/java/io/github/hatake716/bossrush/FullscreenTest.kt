@@ -1,9 +1,11 @@
 package io.github.hatake716.bossrush
 
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.graphics.*
 import android.os.SystemClock
 import android.view.View
+import android.view.Surface
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -78,7 +80,17 @@ class FullscreenTest {
         }
         try {
             for(direction in listOf("left","right")) {
+                // UiDevice's user-rotation lock alone does not override sensorLandscape.
+                // Ask the test Activity for each actual landscape orientation as well.
+                instrumentation.runOnMainSync {
+                    rule.activity.requestedOrientation=if(direction=="left") ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                        else ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+                }
                 if(direction=="left") device.setOrientationLeft() else device.setOrientationRight()
+                val rotation=if(direction=="left") Surface.ROTATION_90 else Surface.ROTATION_270
+                val deadline=SystemClock.uptimeMillis()+5000
+                while(device.displayRotation!=rotation && SystemClock.uptimeMillis()<deadline) SystemClock.sleep(100)
+                assertEquals("The actual display must rotate $direction",rotation,device.displayRotation)
                 SystemClock.sleep(650)
                 val mute=device.wait(Until.findObject(By.desc("♪ ON")),5000) ?: error("Missing mute")
                 val bounds=mute.visibleBounds
@@ -87,6 +99,10 @@ class FullscreenTest {
                     val safe=ViewCompat.getRootWindowInsets(view)!!.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.displayCutout())
                     assertTrue(bounds.left>=safe.left)
                     assertTrue(bounds.right<=view.width-safe.right)
+                    if(safe.left+safe.right>0) {
+                        assertTrue("The camera hole follows $direction",if(direction=="left") safe.left>0 && safe.right==0
+                            else safe.right>0 && safe.left==0)
+                    }
                     assertEquals(view.width.toFloat(),view.viewport.screenX(view.viewport.fullLeft+view.viewport.fullWidth),.01f)
                 }
                 tap("♪ ON"); tap("♪ OFF")
@@ -98,6 +114,9 @@ class FullscreenTest {
                 // A second direction should start a fresh run without a confirmation dialog.
                 instrumentation.runOnMainSync { rule.activity.gameView.hasSave=false }
             }
-        } finally { device.unfreezeRotation() }
+        } finally {
+            instrumentation.runOnMainSync { rule.activity.requestedOrientation=ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE }
+            device.unfreezeRotation()
+        }
     }
 }
