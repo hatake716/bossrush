@@ -16,7 +16,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     var bestScore=0
     var onContinue: (() -> Unit)?=null
     var onSoundChanged: ((Boolean) -> Unit)?=null
-    private val art=PixelArt()
+    private val art=PixelArt(context.assets)
     private val battleEffects=BattleEffects()
     private val p=Paint().apply { isAntiAlias=false }
     private val type=Paint().apply { isAntiAlias=true; typeface=Typeface.create("sans-serif",Typeface.NORMAL) }
@@ -32,6 +32,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     private val keySet=mutableSetOf<Int>()
     private var pressed: String?=null
     private var codexPage=0
+    private var portraitExpanded=false
     private var returnScreen=Screen.TITLE
     private var focusId=View.NO_ID
     private var hoveredId=View.NO_ID
@@ -67,6 +68,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     }
     private fun resetInput() { joystickId=-1; skillPointer=-1; pressed=null; stickX=0f; stickY=0f; engine.moveX=.0; engine.moveY=.0; engine.heldSkill=-1; keySet.clear() }
     fun goBack() {
+        if(portraitExpanded) { portraitExpanded=false; invalidate(); return }
         when(engine.screen) {
             Screen.BATTLE,Screen.CUTIN -> engine.pause()
             Screen.PAUSED -> engine.unpause()
@@ -87,7 +89,11 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         type.textSize=size
         var row=""; var yy=y
         for(ch in s) {
-            if(ch=='\n' || type.measureText(row+ch)>width) { text(c,row,x,yy,size,color); yy+=line; row=if(ch=='\n') "" else "$ch" } else row+=ch
+            // Hang closing punctuation on the preceding line instead of leaving a
+            // Japanese full stop or closing bracket alone at the next line's start.
+            if(ch=='\n' || (type.measureText(row+ch)>width && ch !in "、。，．！？）」』】〕〉》")) {
+                text(c,row,x,yy,size,color); yy+=line; row=if(ch=='\n') "" else "$ch"
+            } else row+=ch
         }
         if(row.isNotEmpty()) text(c,row,x,yy,size,color)
         return yy+line
@@ -209,7 +215,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         rect(c,36f,79f,355f,416f,Ink.deep); border(c,36f,79f,355f,416f)
         pixel(c,"ENCOUNTER ${(stage+1).toString().padStart(2,'0')} / 32",60f,103f,1.8f)
         for(i in 0..5) border(c,80f+i*10,166f+i*10,260f-i*20,235f-i*20,Ink.mid,1f)
-        art.sprite(c,b.form,214f,366f,4.4f,stage)
+        art.boss(c,b.id,214f,405f,300f,270f)
         text(c,b.realm,214f,447f,19f,Ink.light,Paint.Align.CENTER)
         pixel(c,"${b.bpm} BPM",214f,467f,1.2f,Ink.mid,true)
         text(c,b.epithet,431f,108f,15f,Ink.mid)
@@ -258,7 +264,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             art.icon(c,"ice",m.x.toFloat()-8,m.y.toFloat()-8,1f)
         }
         p.color=Ink.dark; c.drawOval(e.boss.x.toFloat()-46,e.boss.y.toFloat()-2,e.boss.x.toFloat()+46,e.boss.y.toFloat()+18,p)
-        art.sprite(c,b.form,e.boss.x.toFloat(),e.boss.y.toFloat()+sin(clock*3).toFloat()*2,2.25f,r.stage)
+        art.boss(c,b.id,e.boss.x.toFloat(),e.boss.y.toFloat()+5+sin(clock*3).toFloat()*2,160f,110f)
         p.color=Ink.light; p.style=Paint.Style.STROKE; p.strokeWidth=1f
         c.drawOval(e.boss.x.toFloat()-34,e.boss.y.toFloat()-9,e.boss.x.toFloat()+34,e.boss.y.toFloat()+17,p)
         p.style=Paint.Style.FILL
@@ -353,7 +359,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             rect(c,i*38f-drift,166f+i%5*36,54f+(i%3)*15,2f,Ink.mid)
         }
         border(c,0f,158f,960f,196f,Ink.mid,3f)
-        art.sprite(c,b.form,202f,337f,4.5f,engine.run!!.stage)
+        art.boss(c,b.id,202f,340f,280f,172f)
         pixel(c,"LIMIT BREAK",384f,192f,2.8f,Ink.deep)
         text(c,b.ultimate,383f,269f,30f,Ink.dark)
         text(c,b.name,385f,309f,18f,Ink.deep)
@@ -458,8 +464,11 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             buttons.add(UiButton("図鑑 ${b.name}",RectF(x,y,x+190,y+74)) { engine.selectedBoss=index })
         }
         val b=Bosses.all[engine.selectedBoss]
+        if(!portraitExpanded) contentDescription="BOSSRUSH 神話図鑑 ${b.name}。${b.epithet}。${b.lore}"
         rect(c,459f,81f,465f,381f,Ink.deep)
-        art.sprite(c,b.form,538f,218f,2.5f,engine.selectedBoss)
+        art.boss(c,b.id,538f,232f,145f,143f)
+        text(c,"タップで拡大",538f,248f,10f,Ink.mid,Paint.Align.CENTER)
+        buttons.add(UiButton("${b.name}の姿を拡大",RectF(465f,84f,609f,253f)) { portraitExpanded=true })
         text(c,b.name,614f,121f,24f)
         text(c,b.epithet,614f,150f,13f,Ink.mid)
         wrap(c,b.lore,614f,180f,289f,14f)
@@ -472,6 +481,28 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         pixel(c,"${codexPage+1} / 4",233f,496f,1.5f,Ink.mid,true)
         button(c,"→",364f,483f,62f,36f,enabled=codexPage<3) { codexPage++; engine.selectedBoss=codexPage*8 }
         text(c,"参考：散文エッダ / 古エッダ（詳細はREADME）",481f,506f,13f,Ink.mid)
+        if(portraitExpanded) portrait(c)
+    }
+    private fun portrait(c: Canvas) {
+        val b=Bosses.all[engine.selectedBoss]
+        contentDescription="BOSSRUSH 神話図鑑 拡大 ${b.name}。${b.epithet}。${b.lore}"
+        rect(c,0f,0f,960f,540f,Ink.dark)
+        border(c,22f,22f,916f,496f,Ink.mid)
+        pixel(c,"BESTIARY / ${(engine.selectedBoss+1).toString().padStart(2,'0')}",48f,45f,1.8f,Ink.mid)
+        text(c,b.name,645f,169f,28f)
+        wrap(c,b.epithet,647f,204f,255f,15f,Ink.mid)
+        wrap(c,b.lore,647f,249f,255f,15f,Ink.light,25f)
+        text(c,b.realm,326f,488f,16f,Ink.mid,Paint.Align.CENTER)
+        art.boss(c,b.id,326f,455f,530f,363f)
+        // Only the modal controls remain in the virtual accessibility tree.
+        buttons.clear()
+        button(c,"図鑑へ戻る",789f,40f,123f,37f) { portraitExpanded=false }
+        button(c,"前の神",649f,446f,118f,44f,enabled=engine.selectedBoss>0) {
+            engine.selectedBoss--; codexPage=engine.selectedBoss/8
+        }
+        button(c,"次の神",785f,446f,118f,44f,enabled=engine.selectedBoss<31) {
+            engine.selectedBoss++; codexPage=engine.selectedBoss/8
+        }
     }
     private fun help(c: Canvas) {
         header(c,"HOW TO PLAY")
