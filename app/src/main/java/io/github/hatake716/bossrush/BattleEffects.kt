@@ -100,6 +100,36 @@ class BattleEffects {
             PixelFont.draw(c,if(h.shape=="tower") "IN" else "SAFE",x,y+26,1.2f,colors.core,true)
         }
     }
+    /** Ground-level direction marks; striped telegraphs remain the damage boundary. */
+    fun movement(c: Canvas,move: BossMove,bossId: String) {
+        val colors=palette(move.anchor.ultimate,bossId)
+        val u=move.progress; val x=move.toX.toFloat(); val y=move.toY.toFloat()
+        if(move.finished) return
+        stroke(colors.core,2f,190)
+        val r=12f+((1-u)*7).toFloat()
+        // Open brackets distinguish a destination from a filled danger area.
+        for(i in 0..3) {
+            c.save(); c.rotate(i*90f,x,y)
+            c.drawLine(x-r,y-r,x-r+7,y-r,p); c.drawLine(x-r,y-r,x-r,y-r+7,p)
+            c.restore()
+        }
+        if(move.kind==BossMoveKind.BLINK) {
+            for((xx,yy) in listOf(move.fromX to move.fromY,move.toX to move.toY)) {
+                c.save(); c.translate(xx.toFloat(),yy.toFloat()); c.rotate((u*90).toFloat())
+                stroke(colors.energy,3f); c.drawRect(-17f,-17f,17f,17f,p)
+                stroke(colors.core,2f); c.drawRect(-10f,-10f,10f,10f,p); c.restore()
+            }
+        } else if(u>0) {
+            for(i in 1..10) {
+                val at=(u-i*.025).coerceAtLeast(0.0); val (xx,yy)=move.point(at)
+                val spread=(i%3-1)*5
+                fill(if(i%2==0) colors.core else colors.energy,180-i*12)
+                val size=if(move.kind==BossMoveKind.CHARGE) 4f else 3f
+                c.drawRect(xx.toInt().toFloat(),yy.toInt()+spread.toFloat(),xx.toInt()+size,yy.toInt()+spread+size,p)
+            }
+        }
+        p.alpha=255; p.style=Paint.Style.FILL
+    }
     fun impact(c: Canvas,impact: BattleImpact,bossId: String) {
         val h=impact.hazard; val colors=palette(h.ultimate,bossId); val u=impact.progress; val fade=(1-u).pow(1.3)
         val x=h.x; val y=h.y

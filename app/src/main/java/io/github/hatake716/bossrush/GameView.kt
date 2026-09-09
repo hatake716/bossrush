@@ -322,8 +322,19 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             c.drawCircle(m.x.toFloat(),m.y.toFloat(),m.radius.toFloat(),p); p.style=Paint.Style.FILL
             art.icon(c,"ice",m.x.toFloat()-8,m.y.toFloat()-8,1f)
         }
-        p.color=Ink.dark; c.drawOval(e.boss.x.toFloat()-46,e.boss.y.toFloat()-2,e.boss.x.toFloat()+46,e.boss.y.toFloat()+18,p)
-        art.boss(c,b.id,e.boss.x.toFloat(),e.boss.y.toFloat()+5+sin(clock*3).toFloat()*2,160f,110f)
+        val motion=e.bossMove
+        motion?.let { battleEffects.movement(c,it,b.id) }
+        val lift=(motion?.lift ?: .0).coerceAtMost((e.boss.y-108).coerceAtLeast(.0)).toFloat()
+        val shadowWidth=46f-lift*.35f
+        p.color=Ink.dark; c.drawOval(e.boss.x.toFloat()-shadowWidth,e.boss.y.toFloat()-2,e.boss.x.toFloat()+shadowWidth,e.boss.y.toFloat()+18-lift*.15f,p)
+        if(motion!=null && motion.progress>0 && !motion.finished && motion.kind!=BossMoveKind.BLINK) {
+            for(i in 2 downTo 1) {
+                val u=(motion.progress-i*.12).coerceAtLeast(.0); val at=motion.point(u)
+                val trailLift=(if(motion.kind==BossMoveKind.LEAP) sin(u*PI)*48 else .0).coerceAtMost((at.second-108).coerceAtLeast(.0))
+                art.boss(c,b.id,at.first.toFloat(),(at.second+5-trailLift).toFloat(),160f,110f,alpha=65-i*20)
+            }
+        }
+        art.boss(c,b.id,e.boss.x.toFloat(),e.boss.y.toFloat()+5-lift+sin(clock*3).toFloat()*2,160f,110f,alpha=motion?.opacity ?: 255)
         p.color=Ink.light; p.style=Paint.Style.STROKE; p.strokeWidth=1f
         c.drawOval(e.boss.x.toFloat()-34,e.boss.y.toFloat()-9,e.boss.x.toFloat()+34,e.boss.y.toFloat()+17,p)
         p.style=Paint.Style.FILL
@@ -588,7 +599,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             "06  安心して再開" to "操作中のコントローラーが切断されると戦闘を一時停止します。再接続してSTARTで再開。タッチ操作にもいつでも切り替えられます。"
         ) else listOf(
             "01  移動と攻撃" to "戦場の左半分をドラッグして移動。右の技をタップ、長押しで連続使用。攻撃は自動でボスの方向を狙います。足元の丸が当たり判定です。",
-            "02  予兆を読む" to "斜線が危険地帯。輪の内側は安全です。月印と白いルーンの円は中へ入りましょう。吹き飛ばしは中央へ。前後攻撃は切り返します。",
+            "02  予兆を読む" to "斜線は危険地帯。突進は帯の横へ、飛び込みは着地点の円の外へ。輪・月印・白いルーンは内側へ。吹き飛ばしは中央へ。前後攻撃は切り返します。",
             "03  技と召喚" to "技にはゲージと待機時間が必要。召喚士は回復速度が半分で仲間は2体まで。はにわは正面を守り、再タップすると近接攻撃します。",
             "04  休むとアイテム" to "休むと2秒間動けず、その後に回復。下のアイテムを選ぶと時間が止まり、効果を確認して使えます。かばんは特殊アイテムを含めて5個まで。",
             "05  成長と保存" to "撃破後に技を1つ強化。Lv.16が最大。盗賊は特殊品も1つ選べます。戦闘前と買い物後に自動保存。敗北で冒険終了、最高スコアは残ります。",

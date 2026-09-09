@@ -31,6 +31,8 @@ class FeedbackTest {
             assertTrue("$event must play on impact",e.sounds.contains(event))
         }
         val e=battle(Job.SUMMONER); e.useSkill(2); repeat(80) { e.update(1.0/60) }
+        // Approach again after the boss repositions; this assertion tests the melee sound.
+        e.player.x=e.boss.x; e.player.y=e.boss.y+30
         e.gauge=100.0; e.sounds.clear(); assertTrue(e.useSkill(2)); assertTrue(e.sounds.contains("haniwa"))
     }
     @Test fun simultaneousEffectsAreMixedToCompletionAndVoiceCountIsBounded() {

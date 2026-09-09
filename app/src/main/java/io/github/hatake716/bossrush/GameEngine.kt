@@ -22,7 +22,7 @@ data class Hazard(
     val angle: Double = 0.0, var delay: Double = 1.4, val duration: Double = .28*BossTiming.SCALE,
     val multiplier: Double = 1.0, var time: Double = 0.0, var resolved: Boolean = false,
     val sourceX: Double = x, val sourceY: Double = y, val label: String = "",
-    val ultimate: Boolean = false
+    val ultimate: Boolean = false, val swept: Boolean = false
 ) {
     fun contains(px: Double, py: Double, radius: Double = 7.0): Boolean {
         val dx = px-x; val dy = py-y; val d = hypot(dx,dy)
@@ -65,6 +65,14 @@ class GameEngine(random: Random=Random.Default) {
     val iceMarks = mutableListOf<IceMark>()
     val hazards = mutableListOf<Hazard>()
     val impacts = mutableListOf<BattleImpact>()
+    var bossMove: BossMove?=null
+        private set
+    private var bossOldX=300.0
+    private var bossOldY=125.0
+    private var bossTeleported=false
+    private var idleTargetX=300.0
+    private var idleTargetY=125.0
+    private var nextIdleTarget=0.0
     val particles = mutableListOf<Particle>()
     val cues = mutableListOf<Cue>()
     val normalCues = mutableListOf<NormalCue>()
@@ -108,7 +116,7 @@ class GameEngine(random: Random=Random.Default) {
     private var trial = false
     private var finalEnding = false
 
-    fun changeScreen(value: Screen) { screen=value; screenAge=0.0; heldSkill=-1; moveX=0.0; moveY=0.0 }
+    fun changeScreen(value: Screen) { if(value in listOf(Screen.TITLE,Screen.REWARD,Screen.GAMEOVER,Screen.ENDING)) bossMove=null; screen=value; screenAge=0.0; heldSkill=-1; moveX=0.0; moveY=0.0 }
     fun newRun() {
         run = Run(selectedJob); resultRecorded=false; finalEnding=false
         changeScreen(Screen.INTRO); onCheckpoint?.invoke()
@@ -126,6 +134,7 @@ class GameEngine(random: Random=Random.Default) {
         boss=Actor(300.0,125.0,1e12,1e12)
         gauge=100.0; cooldowns.fill(0.0); buffs.clear(); summons.clear(); projectiles.clear(); iceMarks.clear()
         hazards.clear(); impacts.clear(); particles.clear(); cues.clear(); normalCues.clear(); sounds.clear(); director.reset()
+        bossMove=null; bossOldX=boss.x; bossOldY=boss.y; nextIdleTarget=0.0
         elapsed=0.0; damageTaken=0.0; damageDone=0.0; restTime=0.0; invulnerability=0.0
         ultimateUsed=false; ultimateCount=0; cutinTime=0.0; patternNumber=0; nextPattern=1.6*BossTiming.SCALE
         message="予兆の外へ移動。技を押して攻撃！"; messageTime=4.0
@@ -227,7 +236,7 @@ class GameEngine(random: Random=Random.Default) {
         } else if(boss.hp<=0.0) victory()
     }
     private fun startUltimate() {
-        ultimateUsed=true; ultimateCount++; director.ultimateStarted()
+        ultimateUsed=true; ultimateCount++; director.ultimateStarted(); bossMove=null
         hazards.clear(); impacts.clear(); cues.clear(); normalCues.clear()
         castName=bossInfo.ultimate; castHint=bossInfo.hint; sounds.add("ultimate")
         if(ultimateCount==1) {
@@ -299,7 +308,9 @@ class GameEngine(random: Random=Random.Default) {
             return
         }
         if(screen!=Screen.BATTLE) return
+        val playerOldX=player.x; val playerOldY=player.y
         impacts.forEach { it.age+=dt }; impacts.removeAll { it.age>=it.lifetime }
+        if(!trial) { hazards.forEach { it.time+=dt }; advanceBoss(dt) }
         elapsed+=dt; messageTime=max(0.0,messageTime-dt); invulnerability=max(0.0,invulnerability-dt)
         for(i in cooldowns.indices) cooldowns[i]=max(0.0,cooldowns[i]-dt)
         buffs.keys.toList().forEach { buffs[it]=max(0.0,buffs.getValue(it)-dt) }
@@ -314,11 +325,6 @@ class GameEngine(random: Random=Random.Default) {
             if(heldSkill>=0) useSkill(heldSkill)
         }
         if(screen!=Screen.BATTLE) return
-        if(!trial) {
-            // Small, readable movement. A lock-on spell can miss after its tracking window.
-            boss.x=300+sin(elapsed*.47+(run?.stage ?: 0)*.3)*32
-            boss.y=122+sin(elapsed*.33)*15
-        }
         for(s in summons.toList()) {
             s.life-=dt; s.timer-=dt
             val angle=atan2(boss.y-player.y,boss.x-player.x)
@@ -337,8 +343,11 @@ class GameEngine(random: Random=Random.Default) {
         summons.removeAll { it.life<=0 }
         if(screen!=Screen.BATTLE) return
         for(p in projectiles.toList()) {
+            val px=p.x; val py=p.y
             p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt
-            if(hypot(p.x-boss.x,p.y-boss.y)<28+p.radius*.3) {
+            val oldX=if(trial || bossTeleported) boss.x else bossOldX
+            val oldY=if(trial || bossTeleported) boss.y else bossOldY
+            if(BossMobility.segmentDistance(px-oldX,py-oldY,p.x-boss.x,p.y-boss.y)<28+p.radius*.3) {
                 damageBoss(p.power); p.life=0.0
                 if(!trial) { particles.add(Particle(p.x,p.y,if(p.kind=="fire") "BURST" else "HIT",.25)); sounds.add("${p.kind}-hit") }
             }
@@ -361,7 +370,7 @@ class GameEngine(random: Random=Random.Default) {
         cues.removeAll(due.toSet())
         due.forEach {
             cast(it.pattern,true,it.ordinal)
-            val finish=elapsed+(hazards.maxOfOrNull { h -> h.delay-h.time } ?: .0)+.55*BossTiming.SCALE
+            val finish=elapsed+(hazards.maxOfOrNull { h -> h.delay-h.time+if(h.swept) h.duration else .0 } ?: .0)+.55*BossTiming.SCALE
             if(cues.isNotEmpty() && cues.first().at<finish) {
                 val shift=finish-cues.first().at
                 cues.forEach { cue -> cue.at+=shift }
@@ -377,7 +386,21 @@ class GameEngine(random: Random=Random.Default) {
             castNormal(i,patternNumber++)
         }
         for(h in hazards) {
-            h.time+=dt
+            if(h.swept && !h.resolved) {
+                val motion=bossMove
+                if(motion!=null && motion.anchor===h && h.time>=h.delay) {
+                    if(!motion.hitPlayer && BossMobility.segmentDistance(bossOldX-playerOldX,bossOldY-playerOldY,boss.x-player.x,boss.y-player.y)<h.b/2+7) {
+                        motion.hitPlayer=true
+                        hurt(bossDamage()*h.multiplier,bossOldX,bossOldY,true)
+                    }
+                    if(h.time>=h.delay+h.duration) {
+                        h.resolved=true
+                        if(impacts.size>=24) impacts.removeAt(0)
+                        impacts.add(BattleImpact(h.copy()))
+                    }
+                }
+                continue
+            }
             if(!h.resolved && h.time>=h.delay) {
                 h.resolved=true
                 if(impacts.size>=24) impacts.removeAt(0)
@@ -394,6 +417,58 @@ class GameEngine(random: Random=Random.Default) {
         }
         hazards.removeAll { it.time>=it.delay+it.duration }
     }
+    private fun advanceBoss(dt: Double) {
+        bossOldX=boss.x; bossOldY=boss.y; bossTeleported=false
+        val move=bossMove
+        if(move!=null) {
+            if(!hazards.contains(move.anchor)) { bossMove=null; return }
+            val u=move.progress; val point=move.point(u)
+            boss.x=point.first; boss.y=point.second
+            bossTeleported=move.kind==BossMoveKind.BLINK && hypot(boss.x-bossOldX,boss.y-bossOldY)>1
+            boss.facing=atan2(move.toY-move.fromY,move.toX-move.fromX)
+            return
+        }
+        if(hazards.any { !it.resolved } || normalCues.isNotEmpty() || cues.isNotEmpty()) return
+        val profile=BossMobility.forBoss(bossInfo.id)
+        if(elapsed>=nextIdleTarget) {
+            val target=BossMobility.target(this,profile.copy(kind=BossMoveKind.FLANK), (elapsed/1.4).toInt())
+            idleTargetX=target.first; idleTargetY=target.second; nextIdleTarget=elapsed+1.4
+        }
+        val dx=idleTargetX-boss.x; val dy=idleTargetY-boss.y; val d=hypot(dx,dy)
+        if(d>1) {
+            val step=min(d,dt*(if(profile.kind==BossMoveKind.FLANK) 88 else 64))
+            boss.x+=dx/d*step; boss.y+=dy/d*step; boss.facing=atan2(dy,dx)
+        }
+    }
+
+    private fun ultimateMovement(pattern: Pattern,ordinal: Int,created: MutableList<Hazard>): BossMove {
+        val profile=BossMobility.forBoss(bossInfo.id)
+        val delay=created.minOf { it.delay }
+        if(profile.kind==BossMoveKind.CHARGE && pattern in listOf(Pattern.CONE,Pattern.LANES,Pattern.SWEEP)) {
+            val move=BossMobility.charge(this,profile,ordinal,delay,true)
+            created[0]=move.anchor
+            return move
+        }
+        val landing=created.firstOrNull { it.shape in listOf("circle","knock","tower","safe") }
+        val kind=when {
+            pattern==Pattern.KNOCKBACK || pattern in listOf(Pattern.CIRCLE,Pattern.CHASE,Pattern.METEORS) -> BossMoveKind.LEAP
+            profile.kind==BossMoveKind.BLINK || pattern==Pattern.ECLIPSE -> BossMoveKind.BLINK
+            else -> BossMoveKind.FLANK
+        }
+        val destination=if(landing!=null) landing.x.coerceIn(84.0,516.0) to landing.y.coerceIn(112.0,276.0)
+            else BossMobility.target(this,profile.copy(kind=kind),ordinal)
+        val (x,y)=destination
+        val aimDelta=atan2(player.y-y,player.x-x)-atan2(player.y-boss.y,player.x-boss.x)
+        for(i in created.indices) {
+            val h=created[i]
+            if(h===landing && kind==BossMoveKind.LEAP) { h.x=x; h.y=y }
+            else if(abs(h.x-boss.x)<.001 && abs(h.y-boss.y)<.001) {
+                created[i]=h.copy(x=x,y=y,angle=if(h.shape=="cone") h.angle+aimDelta else h.angle,sourceX=x,sourceY=y)
+            }
+        }
+        return BossMove(kind,boss.x,boss.y,x,y,created.first(),if(kind==BossMoveKind.BLINK) .26 else profile.tempo)
+    }
+
     fun bossDamage() = BossDifficulty(run?.stage ?: 0).damage
 
     fun castNormal(slot: Int,ordinal: Int) {
@@ -406,6 +481,7 @@ class GameEngine(random: Random=Random.Default) {
         attack.draw(arena,cue.wave)
         val partner=if(enraged) combineNormal(arena.hazards,cue.slot,cue.ordinal+cue.wave) else null
         ensureReachable(arena.hazards,difficulty.reaction)
+        bossMove=arena.movement
         hazards.addAll(arena.hazards)
         castName=bossInfo.attackNames[cue.slot]+if(attack.waves>1) "  ${cue.wave+1}/${attack.waves}" else ""
         castHint=if(partner!=null) "二重詠唱：${bossInfo.attackNames[cue.slot]} ＋ $partner" else attack.hint
@@ -441,7 +517,7 @@ class GameEngine(random: Random=Random.Default) {
             if(slot==exclude) continue
             val attack=attacks[slot]
             for(w in 0 until attack.waves) for(side in 0..1) {
-                val arena=NormalArena(this,player.x,player.y,ordinal+side)
+                val arena=NormalArena(this,player.x,player.y,ordinal+side,allowMovement=false)
                 attack.draw(arena,(ordinal+w).mod(attack.waves))
                 arena.hazards.forEach { it.delay=delay }
                 if(distanceToSafety(first+arena.hazards).isFinite()) {
@@ -455,7 +531,7 @@ class GameEngine(random: Random=Random.Default) {
         for(slot in attacks.indices) if(slot!=exclude) {
             val attack=attacks[slot]
             for(w in 0 until attack.waves) {
-                val arena=NormalArena(this,player.x,player.y,ordinal)
+                val arena=NormalArena(this,player.x,player.y,ordinal,allowMovement=false)
                 attack.draw(arena,w)
                 val mirrored=arena.hazards.map { it.copy(x=600-it.x,y=340-it.y,angle=it.angle+PI,delay=delay) }
                 if(distanceToSafety(first+mirrored).isFinite()) {
@@ -531,13 +607,14 @@ class GameEngine(random: Random=Random.Default) {
         // Fairness: even an unbuffed character at an edge must be able to reach a safe
         // point after seeing the telegraph. Sequential casts wait for this resolution.
         val created=hazards.drop(start).toMutableList()
-        val primaryCount=created.size
+        hazards.subList(start,hazards.size).clear()
+        bossMove=if(ultimate) ultimateMovement(pattern,ordinal,created) else null
         if(ultimate && enraged) {
             val partner=combineNormal(created,-1,ordinal+patternNumber++)
-            hazards.addAll(created.drop(primaryCount))
             castHint="二重詠唱：$partner ＋ $castHint"
         }
         ensureReachable(created,.4*BossTiming.SCALE)
+        hazards.addAll(created)
         castDuration=created.minOf { it.delay }; castEnd=elapsed+castDuration
         sounds.add("cast")
     }

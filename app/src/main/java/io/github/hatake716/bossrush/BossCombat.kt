@@ -36,9 +36,11 @@ data class NormalCue(val at: Double,val slot: Int,val wave: Int,val ordinal: Int
 data class NormalAttack(val hint: String,val waves: Int=1,val draw: NormalArena.(Int)->Unit)
 
 /** Each wave locks its geometry when its visible warning starts. */
-class NormalArena(val e: GameEngine,val memoryX: Double,val memoryY: Double,val ordinal: Int) {
+class NormalArena(val e: GameEngine,val memoryX: Double,val memoryY: Double,val ordinal: Int,val allowMovement: Boolean=true) {
     val hazards=mutableListOf<Hazard>()
-    val bx get()=e.boss.x; val by get()=e.boss.y
+    var movement: BossMove?=null
+    private var originX=e.boss.x; private var originY=e.boss.y
+    val bx get()=originX; val by get()=originY
     val px get()=e.player.x; val py get()=e.player.y
     val aim get()=atan2(py-by,px-bx)
     val oldAim get()=atan2(memoryY-by,memoryX-bx)
@@ -47,6 +49,19 @@ class NormalArena(val e: GameEngine,val memoryX: Double,val memoryY: Double,val 
     private fun add(shape: String,x: Double,y: Double,a: Double,b: Double=0.0,angle: Double=0.0,label: String="") {
         hazards.add(Hazard(shape,x,y,a,b,angle,delay=BossDifficulty(e.run!!.stage).warning,
             sourceX=bx,sourceY=by,label=label))
+    }
+    fun mobile(profile: BossMoveProfile,original: NormalAttack,wave: Int) {
+        if(!allowMovement || wave!=0) { original.draw(this,wave); return }
+        val delay=BossDifficulty(e.run!!.stage).warning
+        if(profile.kind==BossMoveKind.CHARGE) {
+            movement=BossMobility.charge(e,profile,ordinal,delay)
+            hazards.add(movement!!.anchor)
+        } else {
+            val (x,y)=BossMobility.target(e,profile,ordinal)
+            if(profile.kind==BossMoveKind.LEAP) circle(x,y,profile.width)
+            else { originX=x; originY=y; original.draw(this,wave) }
+            movement=BossMove(profile.kind,e.boss.x,e.boss.y,x,y,hazards.first(),profile.tempo)
+        }
     }
     fun circle(x: Double,y: Double,r: Double)=add("circle",x.coerceIn(25.0,575.0),y.coerceIn(25.0,309.0),r)
     fun line(x: Double,y: Double,length: Double,width: Double,angle: Double=0.0)=add("line",x,y,length,width,angle)
@@ -59,7 +74,7 @@ class NormalArena(val e: GameEngine,val memoryX: Double,val memoryY: Double,val 
 
 /** Authored normal attacks: shared primitives, distinct targeting, topology and sequences. */
 object BossCombat {
-    val attacks: Map<String,List<NormalAttack>> = linkedMapOf(
+    private val authored: Map<String,List<NormalAttack>> = linkedMapOf(
         "ratatoskr" to listOf(
             NormalAttack("木の実は足元へ。円の外に一歩移動") { circle(px,py,49.0) },
             NormalAttack("枝を渡る順番に、縦の帯が走る",2) { w ->
@@ -276,5 +291,18 @@ object BossCombat {
                 else { for(i in 0..3) line(77.0+i*150,167.0,400.0,42.0,PI/2); for(i in 0..2) line(300.0,53.0+i*115,650.0,34.0) }
             })
     )
+    val attacks: Map<String,List<NormalAttack>> = authored.mapValues { (id,moves) ->
+        val profile=BossMobility.forBoss(id)
+        moves.mapIndexed { slot,attack ->
+            if(slot!=profile.slot) attack else NormalAttack(
+                when(profile.kind) {
+                    BossMoveKind.CHARGE -> "突進の帯から横へ。通過後は追いかけて攻撃"
+                    BossMoveKind.LEAP -> "着地の円から離れる。着地後が攻撃の機会"
+                    BossMoveKind.FLANK -> "回り込んだ位置から攻撃。移動先と予兆を確認"
+                    BossMoveKind.BLINK -> "ルーンの先へ瞬間移動。次の予兆を見直す"
+                }+if(attack.waves>1) " / "+attack.hint else "",attack.waves
+            ) { wave -> mobile(profile,attack,wave) }
+        }
+    }
     fun forBoss(id: String)=attacks.getValue(id)
 }

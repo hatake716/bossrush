@@ -64,8 +64,8 @@ class PixelArt(assets: android.content.res.AssetManager) {
         }
         atlas.draw(c,asset,x,y+2*scale,42*scale,(if(key=="giant") 48 else 40)*scale,color,alpha,flip)
     }
-    fun boss(c: Canvas,id: String,x: Float,feetY: Float,width: Float,height: Float) {
-        atlas.draw(c,"boss_$id",x,feetY,width,height)
+    fun boss(c: Canvas,id: String,x: Float,feetY: Float,width: Float,height: Float,alpha: Int=255) {
+        atlas.draw(c,"boss_$id",x,feetY,width,height,alpha=alpha)
     }
     fun heroKey(job: Job) = when(job) { Job.WARRIOR -> "warrior"; Job.MAGE -> "magehero"; Job.SUMMONER -> "summoner"; Job.THIEF -> "thief" }
     fun icon(c: Canvas,key: String,x: Float,y: Float,scale: Float=2f,color: Int=Ink.light) {
