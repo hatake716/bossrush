@@ -19,11 +19,12 @@ class GameEngineTest {
     @Test fun everySkillHasLinearPowerRangeAndCooldownAndA16LevelCap() {
         for(job in Job.entries) for(slot in 0..3) {
             val s=Skills.all.getValue(job)[slot]
-            assertEquals(s.power*.25,Skills.power(job,slot,1),1e-9)
+            val initial=if(job==Job.SUMMONER && slot==1) .5 else .25
+            assertEquals(s.power*initial,Skills.power(job,slot,1),1e-9)
             assertEquals(s.power,Skills.power(job,slot,16),1e-9)
             assertEquals(Skills.power(job,slot,16),Skills.power(job,slot,99),1e-9)
             for(l in 2..16) {
-                assertEquals(s.power*.05,Skills.power(job,slot,l)-Skills.power(job,slot,l-1),1e-8)
+                assertEquals(s.power*(1-initial)/15,Skills.power(job,slot,l)-Skills.power(job,slot,l-1),1e-8)
                 assertEquals(s.cooldown*.45/15,Skills.cooldown(job,slot,l-1)-Skills.cooldown(job,slot,l),1e-8)
                 assertEquals(s.range*.6/15,Skills.range(job,slot,l)-Skills.range(job,slot,l-1),1e-8)
             }

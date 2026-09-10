@@ -79,7 +79,7 @@ class PlayerGrowthTest {
             e.summons.add(Summon(1,e.player.x-103,e.player.y,12.0,timer=0.0,level=level))
             e.update(.001)
             assertEquals(if(level==1) 0.0 else e.power(0),e.damageDone,1e-8)
-            assertEquals(if(level==1) 10.0 else 10.0+32,e.player.hp,1e-8)
+            assertEquals(if(level==1) 10.0 else 10.0+16,e.player.hp,1e-8)
             if(level==16) assertEquals(setOf(PlayerEffectKind.GIANT,PlayerEffectKind.HEAL),e.playerEffects.map { it.kind }.toSet())
         }
     }

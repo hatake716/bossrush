@@ -389,7 +389,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         for(s in e.summons) {
             val summonScale=(if(s.kind==0) 1.2 else .85)*(1+.20*Skills.progress(s.level))
             art.sprite(c,when(s.kind) { 0 -> "giant"; 1 -> "rabbit"; else -> "haniwa" },s.x.toFloat(),s.y.toFloat(),summonScale.toFloat())
-            bar(c,s.x.toFloat()-14,s.y.toFloat()+8,28f,5f,s.life,if(s.finisher) Skills.finisherDuration(e.job,s.level) else Skills.summonDuration(s.kind,s.level))
+            bar(c,s.x.toFloat()-14,s.y.toFloat()+8,28f,8f,s.life,if(s.finisher) Skills.finisherDuration(e.job,s.level) else Skills.summonDuration(s.kind,s.level))
             if(s.finisher) pixel(c,"V",s.x.toFloat(),s.y.toFloat()-47,1.0f,Ink.paper,true)
         }
         val px=e.player.x.toFloat(); val py=e.player.y.toFloat()
@@ -441,7 +441,9 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             val buffNames=mapOf("shield" to "盾","focus" to "魔力","power" to "攻↑","armor" to "守↑","haste" to "速↑","speed" to "気合","invisible" to "無敵","vanish" to "無影","clones" to "三影")
             val active=e.buffs.filter { it.value>0 }.entries.joinToString(" ") { "${buffNames[it.key]}${ceil(it.value).toInt()}s" }
             text(c,if(active.isEmpty()) (if(e.job==Job.SUMMONER) "通常 ${e.normalSummons}/2 ・ 必殺 ${e.summons.count { it.finisher }}/5" else "足元の小さな丸が当たり判定") else active,671f,260f,12f,Ink.light)
-            if(e.fortune) text(c,"黄金の印：報酬 ×3",671f,281f,11f,Ink.mid)
+            val guard=e.summons.firstOrNull { it.kind==2 }
+            if(guard!=null) text(c,"はにわ 耐久${guard.guardHits}/${Skills.haniwaDurability(guard.level)}回 ・ 残り${ceil(guard.life).toInt()}秒${if(e.fortune) " ・ 金×3" else ""}",671f,281f,11f,Ink.light)
+            else if(e.fortune) text(c,"黄金の印：報酬 ×3",671f,281f,11f,Ink.mid)
             Skills.all.getValue(e.job).forEachIndexed { i,s ->
                 val x=653f+(i%2)*145; val y=310f+(i/2)*88
                 val ready=if(i==3) e.canUsePlayerFinisher else e.cooldowns[i]<=0
@@ -532,7 +534,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             val preview=e.levels[i]+if(selected) 1 else 0
             text(c,Skills.detail(e.job,i,preview),x+16,y+if(thief) 91 else 99,11f,Ink.mid)
             text(c,Skills.rangeDetail(e.job,i,preview),x+16,y+if(thief) 107 else 117,10f,if(selected) Ink.light else Ink.mid)
-            if(!thief) wrap(c,s.description,x+16,y+135,178f,11f,Ink.mid,16f)
+            if(!thief) wrap(c,Skills.description(e.job,i,preview),x+16,y+135,178f,11f,Ink.mid,16f)
             buttons.add(UiButton("${s.name}を選択",RectF(x,y,x+211,y+(if(thief) 113 else 157)),e.levels[i]<16) { e.selectUpgrade(i) })
         }
         if(thief) {
@@ -547,7 +549,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
                 e.run!!.inventory.forEachIndexed { i,item -> button(c,item.title,217f+i*(141+extra/4),441f,135f,27f) { e.replaceLoot(i) } }
             } else text(c,"特殊アイテムもストック5個に含まれます。",37f,459f,12f,Ink.mid)
         } else {
-            text(c,"威力・効果はLv.1で最大の25%。Lv.16まで直線的に成長。",37f,421f,14f,Ink.mid)
+            text(c,if(e.job==Job.SUMMONER) "はにわは最大4回・20秒。白ウサギの回復は8〜16。" else "威力・効果はLv.1で最大の25%。Lv.16まで直線的に成長。",37f,421f,14f,Ink.mid)
             text(c,"範囲も拡大し、待機時間も短くなります。",37f,447f,14f,Ink.mid)
         }
         button(c,"技の選択をキャンセル",36f,476f,211f,45f,enabled=e.pendingUpgrade>=0) { e.cancelUpgrade() }
@@ -654,7 +656,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         ) else listOf(
             "01  移動と攻撃" to "戦場の左半分をドラッグして移動。右の技をタップ、長押しで連続使用。攻撃は自動でボスの方向を狙います。足元の丸が当たり判定です。",
             "02  予兆を読む" to "斜線は危険地帯。突進は帯の横へ、飛び込みは着地点の円の外へ。輪・月印・白いルーンは内側へ。吹き飛ばしは中央へ。前後攻撃は切り返します。",
-            "03  技と召喚" to "技にはゲージと待機時間が必要。召喚士は回復速度が半分で仲間は2体まで。はにわは最長5秒、被ダメージを1回肩代わりして消滅。再タップで近接攻撃。",
+            "03  技と召喚" to "技にはゲージと待機時間が必要。召喚士は回復速度が半分で仲間は2体まで。はにわは成長で耐久1〜4回・5〜20秒。再タップで近接攻撃。白ウサギの回復は8〜16。",
             "04  必殺技とアイテム" to "4番目の技はHP1/3以下で各ボス戦1回だけ使える必殺技。ゲージ消費なし。回復には薬草や白ウサギを使います。下のアイテムを選ぶと時間が止まり、効果を確認できます。かばんは5個まで。",
             "05  成長と物語" to "撃破後に技を選び、次へ進むと確定。Lv.16が最大。盗賊は特殊品も選択。物語は前後のページへ移動・スキップが可能。ページごと、戦闘前、買い物後に自動保存。",
             "06  高いスコアへ" to "素早く倒し、被ダメージを減らすと高得点。全32体を越えると世界に色が戻ります。物理キー：WASD/矢印で移動、1〜4で技、Escで一時停止。"

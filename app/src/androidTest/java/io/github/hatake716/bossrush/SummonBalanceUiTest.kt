@@ -83,13 +83,14 @@ class SummonBalanceUiTest {
         tap("技の選択をキャンセル")
         ins.runOnMainSync { assertEquals(-1,rule.activity.gameView.engine.pendingUpgrade) }
     }
-    @Test fun levelSixteenGuardExpiresAfterFiveActiveSecondsWithFullInitialLifeBar() {
+    @Test fun levelSixteenGuardExpiresAfterTwentyActiveSecondsWithFullInitialLifeBar() {
         var expiresAt=0.0
         ins.runOnMainSync { rule.activity.gameView.engine.levels[2]=16 }
         tap("技3 はにわを呼ぶ")
         ins.runOnMainSync {
             val e=rule.activity.gameView.engine
             val summon=e.summons.single()
+            assertEquals(4,summon.guardHits)
             assertTrue(summon.life/Skills.summonDuration(summon.kind,summon.level)>.85)
             expiresAt=e.elapsed+summon.life
             e.pause()
@@ -97,16 +98,61 @@ class SummonBalanceUiTest {
         SystemClock.sleep(5200)
         ins.runOnMainSync {
             val e=rule.activity.gameView.engine
-            assertEquals(1,e.summons.size); assertTrue(e.summons.single().life>4.0)
+            assertEquals(1,e.summons.size); assertTrue(e.summons.single().life>19.0)
             e.unpause()
         }
         SystemClock.sleep(100); screenshot("haniwa-active")
-        awaitGame("Five active combat seconds",12000) { it.elapsed>=expiresAt }
+        awaitGame("Twenty active combat seconds",32000) { it.elapsed>=expiresAt }
         ins.runOnMainSync {
             val e=rule.activity.gameView.engine
             assertTrue(e.summons.isEmpty()); assertEquals(e.player.maxHp,e.player.hp,0.0)
             e.hurt(10.0); assertEquals(10.0,e.damageTaken,1e-8)
         }
         screenshot("haniwa-expired")
+    }
+
+    @Test fun maxLevelGuardianBlocksFourHitsAndRabbitHealsSixteen() {
+        ins.runOnMainSync { rule.activity.gameView.engine.levels.fill(16) }
+        tap("技3 はにわを呼ぶ"); screenshot("haniwa-four-charges")
+        for(hit in 1..4) {
+            ins.runOnMainSync {
+                val e=rule.activity.gameView.engine
+                e.hazards.add(Hazard("circle",e.player.x,e.player.y,50.0,delay=.15))
+            }
+            awaitGame("Guardian hit $hit") { (it.summons.firstOrNull { s -> s.kind==2 }?.guardHits ?: 0)==4-hit }
+            ins.runOnMainSync {
+                val e=rule.activity.gameView.engine
+                assertEquals(e.player.maxHp,e.player.hp,0.0); assertEquals(0.0,e.damageTaken,0.0)
+                assertEquals(if(hit==4) 0 else 1,e.normalSummons)
+            }
+            if(hit==3) screenshot("haniwa-one-charge-left")
+        }
+        ins.runOnMainSync {
+            val e=rule.activity.gameView.engine
+            e.hazards.add(Hazard("circle",e.player.x,e.player.y,50.0,delay=.1))
+        }
+        awaitGame("Fifth hit damaged the summoner") { it.damageTaken>0 }
+        ins.runOnMainSync {
+            val e=rule.activity.gameView.engine
+            assertEquals(e.bossDamage(),e.damageTaken,1e-8); e.player.hp=20.0; e.gauge=100.0
+        }
+        tap("技2 白ウサギを呼ぶ")
+        awaitGame("Maximum rabbit healing") { it.player.hp>20 }
+        ins.runOnMainSync { assertEquals(36.0,rule.activity.gameView.engine.player.hp,1e-8) }
+        screenshot("rabbit-heal-sixteen")
+        ins.runOnMainSync {
+            val e=rule.activity.gameView.engine
+            e.victory(); e.levels[2]=5; e.levels[1]=15
+        }
+        tap("はにわを呼ぶを選択"); screenshot("haniwa-growth-five-to-six")
+        tap("技の選択をキャンセル")
+        tap("白ウサギを呼ぶを選択"); screenshot("rabbit-growth-fifteen-to-sixteen")
+        ins.runOnMainSync {
+            val e=rule.activity.gameView.engine
+            assertEquals(5,e.levels[2]); assertEquals(15,e.levels[1])
+            assertTrue(Skills.description(e.job,2,6).contains("耐久2回 / 持続10秒"))
+            assertTrue(Skills.detail(e.job,1,16).startsWith("回復 16.0"))
+        }
+        tap("技の選択をキャンセル")
     }
 }

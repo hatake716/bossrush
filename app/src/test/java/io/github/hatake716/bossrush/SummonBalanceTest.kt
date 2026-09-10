@@ -55,10 +55,10 @@ class SummonBalanceTest {
         assertEquals(0.0,e.damageTaken,0.0); assertEquals(e.player.maxHp,e.player.hp,0.0)
     }
 
-    @Test fun guardianExpiresAtFiveSecondsAtEveryLevelAndPausesWithCombat() {
+    @Test fun guardianLifetimeGrowsOneSecondPerLevelAndPausesWithCombat() {
         for(level in 1..16) {
             val e=battle(level); e.useSkill(2)
-            tick(e,4.99); assertEquals(1,e.summons.size)
+            tick(e,level+3.99); assertEquals(1,e.summons.size)
             val life=e.summons.single().life
             e.pause(); tick(e,6.0); assertEquals(life,e.summons.single().life,0.0)
             e.unpause(); e.update(.01); assertTrue(e.summons.isEmpty())
@@ -76,7 +76,10 @@ class SummonBalanceTest {
         e.hurt(1000.0); assertEquals(1,e.normalSummons); assertEquals(0,e.summons.single().kind)
         e.gauge=100.0; assertTrue(e.useSkill(1)); assertEquals(2,e.normalSummons)
         val other=battle(16); other.useSkill(2); other.player.y=other.boss.y+40
-        tick(other,1.3); other.useSkill(2); tick(other,3.7)
+        tick(other,1.3); other.hurt(40.0)
+        val guardHits=other.summons.single().guardHits
+        other.useSkill(2); assertEquals(guardHits,other.summons.single().guardHits)
+        tick(other,18.7)
         assertTrue(other.summons.isEmpty())
     }
 
@@ -90,14 +93,52 @@ class SummonBalanceTest {
         assertEquals(e.player.maxHp,e.player.hp,0.0)
     }
 
-    @Test fun rabbitHealsHalfThePreviousAmountAtEveryLevelOnTheSameTwoSecondInterval() {
+    @Test fun rabbitHealingGrowsFromEightToSixteenOnTheSameTwoSecondInterval() {
         for(level in 1..16) {
             val e=battle(level,31); e.player.hp=1.0; e.buffs["power"]=10.0
             e.useSkill(1)
-            val amount=64.0*(.25+.05*(level-1))/2
+            val amount=8.0+8.0*(level-1)/15
             tick(e,.11); assertEquals(1.0+amount,e.player.hp,1e-8)
             tick(e,1.98); assertEquals(1.0+amount,e.player.hp,1e-8)
             tick(e,.02); assertEquals(1.0+amount*2,e.player.hp,1e-8)
         }
+    }
+
+    @Test fun durabilityGrowsAtLevelsSixElevenAndSixteenAndEachHitConsumesOneCharge() {
+        val expected=intArrayOf(1,1,1,1,1,2,2,2,2,2,3,3,3,3,3,4)
+        for(level in 1..16) {
+            val e=battle(level); e.useSkill(2)
+            val guard=e.summons.single(); val life=guard.life
+            assertEquals(expected[level-1],guard.guardHits)
+            repeat(expected[level-1]) { hit ->
+                e.hurt(10000.0)
+                assertEquals(expected[level-1]-hit-1,guard.guardHits)
+                assertEquals(life,guard.life,0.0)
+                assertEquals(e.player.maxHp,e.player.hp,0.0); assertEquals(0.0,e.damageTaken,0.0)
+                assertEquals(if(hit==expected[level-1]-1) 0 else 1,e.normalSummons)
+            }
+            e.hurt(10.0); assertEquals(10.0,e.damageTaken,0.0)
+        }
+        assertEquals(1,Skills.haniwaDurability(-1)); assertEquals(4,Skills.haniwaDurability(99))
+        assertEquals(5.0,Skills.summonDuration(2,-1),0.0); assertEquals(20.0,Skills.summonDuration(2,99),0.0)
+    }
+
+    @Test fun maxLevelGuardAbsorbsFourOverlappingAttacksAndTheFifthHurts() {
+        val e=battle(16); e.useSkill(2)
+        repeat(5) { e.hazards.add(Hazard("circle",e.player.x,e.player.y,50.0,delay=.01)) }
+        e.update(.01)
+        assertTrue(e.summons.isEmpty()); assertEquals(e.bossDamage(),e.damageTaken,1e-8)
+        assertEquals(e.player.maxHp-e.bossDamage(),e.player.hp,1e-8)
+    }
+
+    @Test fun recastingAfterExhaustionCreatesFreshDurabilityWithoutReplacingTheOtherSummon() {
+        val e=battle(16); e.useSkill(2); e.gauge=100.0; e.useSkill(1)
+        tick(e,1.3); repeat(3) { e.hurt(1000.0) }
+        assertEquals(2,e.normalSummons); assertEquals(1,e.summons.first { it.kind==2 }.guardHits)
+        e.hurt(1000.0); assertEquals(1,e.normalSummons); assertEquals(1,e.summons.single().kind)
+        e.gauge=100.0; assertTrue(e.useSkill(2))
+        val fresh=e.summons.single { it.kind==2 }
+        assertEquals(4,fresh.guardHits); assertEquals(20.0,fresh.life,0.0)
+        assertEquals(2,e.normalSummons)
     }
 }

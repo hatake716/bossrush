@@ -25,8 +25,8 @@ object Skills {
             Skill("終焔五重奏", "limit-flare", 480.0, 0.0, 0.0, 0.0, "HP1/3以下・各戦1回。全域に5連続の大爆発。")),
         Job.SUMMONER to listOf(
             Skill("巨人を呼ぶ", "giant", 96.0, 3.0, 65.0, 60.0, "12秒間、強い拳でボスを攻撃する仲間。"),
-            Skill("白ウサギを呼ぶ", "rabbit", 32.0, 3.0, 80.0, 45.0, "12秒間、2秒ごとに召喚士のHPを回復。"),
-            Skill("はにわを呼ぶ", "haniwa", 64.0, 1.25, 68.0, 40.0, "最長5秒、被ダメージ1回を肩代わりして消滅。再使用で殴る。"),
+            Skill("白ウサギを呼ぶ", "rabbit", 16.0, 3.0, 80.0, 45.0, "12秒間、2秒ごとに召喚士のHPを回復。"),
+            Skill("はにわを呼ぶ", "haniwa", 64.0, 1.25, 68.0, 40.0, "被ダメージを肩代わり。耐久・持続が成長。再使用で殴る。"),
             Skill("五巨人の進軍", "limit-giants", 96.0, 0.0, 65.0, 0.0, "HP1/3以下・各戦1回。別枠で巨人を5体召喚。")),
         Job.THIEF to listOf(
             Skill("ナイフ", "knife", 100.0, .9, 59.0, 15.0, "小さな刃で素早く斬る、中威力の近接攻撃。"),
@@ -36,12 +36,17 @@ object Skills {
     )
     fun fraction(level: Int) = .25 + .05 * (level.coerceIn(1, 16) - 1)
     fun progress(level: Int) = (level.coerceIn(1, 16) - 1) / 15.0
-    fun power(job: Job, slot: Int, level: Int) = all.getValue(job)[slot].power * fraction(level)
+    fun power(job: Job, slot: Int, level: Int) = all.getValue(job)[slot].power *
+        (if(job==Job.SUMMONER && slot==1) .5+.5*progress(level) else fraction(level))
     fun cooldown(job: Job, slot: Int, level: Int) = all.getValue(job)[slot].cooldown * (1 - .45 * progress(level))
     fun range(job: Job, slot: Int, level: Int) = all.getValue(job)[slot].range * (1 + .6 * progress(level))
     fun arrowRadius(level: Int) = 6.0 * (1 + .6 * progress(level))
     fun auraRadius(level: Int) = 22.0 * (1 + .6 * progress(level))
-    fun summonDuration(kind: Int, level: Int) = if(kind==2) 5.0 else 12.0+8*progress(level)
+    fun haniwaDurability(level: Int) = 1+(level.coerceIn(1,16)-1)/5
+    fun summonDuration(kind: Int, level: Int) = if(kind==2) level.coerceIn(1,16)+4.0 else 12.0+8*progress(level)
+    fun description(job: Job, slot: Int, level: Int) = if(job==Job.SUMMONER && slot==2)
+        "耐久${haniwaDurability(level)}回 / 持続${summonDuration(2,level).toInt()}秒。\n身代わり。再使用で殴る。"
+        else all.getValue(job)[slot].description
     fun finisherDuration(job: Job, level: Int) = if(job==Job.SUMMONER) 12.0+8*progress(level) else if(job==Job.THIEF) 10.0 else 0.0
     fun rangeDetail(job: Job, slot: Int, level: Int): String = when {
         slot==3 && job==Job.WARRIOR -> "10連撃 / 距離に関係なく命中"
@@ -54,13 +59,14 @@ object Skills {
     }
     fun detail(job: Job, slot: Int, level: Int): String {
         val skill = all.getValue(job)[slot]
+        if(job==Job.SUMMONER && slot==1) return "回復 %.1f   待機 %.1f秒".format(java.util.Locale.ROOT,power(job,slot,level),cooldown(job,slot,level))
         if(slot==3) return when(job) {
             Job.WARRIOR -> "威力 %.1f ×10 / 各戦1回".format(java.util.Locale.ROOT,power(job,slot,level))
             Job.MAGE -> "威力 %.1f ×5 / 各戦1回".format(java.util.Locale.ROOT,power(job,slot,level))
             Job.SUMMONER -> "拳 %.1f / 召喚 %.1f秒".format(java.util.Locale.ROOT,power(job,slot,level),finisherDuration(job,level))
             Job.THIEF -> "無敵10秒 / 各戦1回"
         }
-        val powerText = if (skill.power > 0) "${if(job==Job.SUMMONER && slot==1) "回復" else "威力"} ${power(job, slot, level).roundToInt()}   " else "効果 ${(fraction(level) * 100).roundToInt()}%   "
+        val powerText = if (skill.power > 0) "威力 ${power(job, slot, level).roundToInt()}   " else "効果 ${(fraction(level) * 100).roundToInt()}%   "
         return powerText + "待機 %.1f秒".format(java.util.Locale.ROOT, cooldown(job, slot, level))
     }
 }

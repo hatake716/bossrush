@@ -15,7 +15,8 @@ data class Run(
     fun copyForTrial() = Run(job, stage, levels.copyOf(), inventory = mutableListOf())
 }
 data class Actor(var x: Double, var y: Double, var hp: Double, var maxHp: Double, var facing: Double = -PI/2)
-data class Summon(val kind: Int, var x: Double, var y: Double, var life: Double, var timer: Double = .1, val level: Int=1, val finisher: Boolean=false, val formation: Int=0)
+data class Summon(val kind: Int, var x: Double, var y: Double, var life: Double, var timer: Double = .1, val level: Int=1, val finisher: Boolean=false, val formation: Int=0,
+    var guardHits: Int=if(kind==2) Skills.haniwaDurability(level) else 0)
 data class Projectile(var x: Double, var y: Double, val vx: Double, val vy: Double, val power: Double, val radius: Double, val kind: String, var life: Double = 3.0, val level: Int=1, var distanceLeft: Double=Double.POSITIVE_INFINITY)
 data class IceMark(var x: Double, var y: Double, val power: Double, val radius: Double, var time: Double = .75, val level: Int=1)
 data class Particle(var x: Double, var y: Double, val text: String, var life: Double = .85, val good: Boolean = false)
@@ -399,13 +400,15 @@ class GameEngine(random: Random=Random.Default) {
     }
     fun hurt(amount: Double) {
         if(amount<=0 || invulnerability>0 || isInvisible || screen!=Screen.BATTLE) return
-        val haniwa=if(job==Job.SUMMONER) summons.firstOrNull { it.kind==2 && it.life>0 } else null
+        val haniwa=if(job==Job.SUMMONER) summons.firstOrNull { it.kind==2 && it.life>0 && it.guardHits>0 } else null
         if(haniwa!=null) {
-            // Consume exactly one guardian. A separate hit may hurt immediately afterwards.
-            summons.remove(haniwa)
+            // Every resolved hit consumes one charge; the expiry timer never resets.
+            haniwa.guardHits--
+            if(haniwa.guardHits==0) summons.remove(haniwa)
             effect(PlayerEffectKind.HANIWA,haniwa.x,haniwa.y,24.0,haniwa.level)
             particles.add(Particle(player.x,player.y-25,"身代わり",good=true))
-            sounds.add("haniwa"); notify("はにわが身代わりになった！")
+            sounds.add("haniwa")
+            notify(if(haniwa.guardHits==0) "はにわが身代わりになった！" else "はにわが身代わり！ 残り${haniwa.guardHits}回")
             return
         }
         var reduction=if((buffs["armor"] ?: 0.0)>0) .5 else 1.0
