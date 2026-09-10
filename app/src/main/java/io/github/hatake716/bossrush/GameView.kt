@@ -389,7 +389,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         for(s in e.summons) {
             val summonScale=(if(s.kind==0) 1.2 else .85)*(1+.20*Skills.progress(s.level))
             art.sprite(c,when(s.kind) { 0 -> "giant"; 1 -> "rabbit"; else -> "haniwa" },s.x.toFloat(),s.y.toFloat(),summonScale.toFloat())
-            bar(c,s.x.toFloat()-14,s.y.toFloat()+8,28f,5f,s.life,if(s.finisher) Skills.finisherDuration(e.job,s.level) else 12.0+8*Skills.progress(s.level))
+            bar(c,s.x.toFloat()-14,s.y.toFloat()+8,28f,5f,s.life,if(s.finisher) Skills.finisherDuration(e.job,s.level) else Skills.summonDuration(s.kind,s.level))
             if(s.finisher) pixel(c,"V",s.x.toFloat(),s.y.toFloat()-47,1.0f,Ink.paper,true)
         }
         val px=e.player.x.toFloat(); val py=e.player.y.toFloat()
@@ -654,7 +654,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         ) else listOf(
             "01  移動と攻撃" to "戦場の左半分をドラッグして移動。右の技をタップ、長押しで連続使用。攻撃は自動でボスの方向を狙います。足元の丸が当たり判定です。",
             "02  予兆を読む" to "斜線は危険地帯。突進は帯の横へ、飛び込みは着地点の円の外へ。輪・月印・白いルーンは内側へ。吹き飛ばしは中央へ。前後攻撃は切り返します。",
-            "03  技と召喚" to "技にはゲージと待機時間が必要。召喚士は回復速度が半分で仲間は2体まで。はにわは正面を守り、再タップすると近接攻撃します。",
+            "03  技と召喚" to "技にはゲージと待機時間が必要。召喚士は回復速度が半分で仲間は2体まで。はにわは最長5秒、被ダメージを1回肩代わりして消滅。再タップで近接攻撃。",
             "04  必殺技とアイテム" to "4番目の技はHP1/3以下で各ボス戦1回だけ使える必殺技。ゲージ消費なし。回復には薬草や白ウサギを使います。下のアイテムを選ぶと時間が止まり、効果を確認できます。かばんは5個まで。",
             "05  成長と物語" to "撃破後に技を選び、次へ進むと確定。Lv.16が最大。盗賊は特殊品も選択。物語は前後のページへ移動・スキップが可能。ページごと、戦闘前、買い物後に自動保存。",
             "06  高いスコアへ" to "素早く倒し、被ダメージを減らすと高得点。全32体を越えると世界に色が戻ります。物理キー：WASD/矢印で移動、1〜4で技、Escで一時停止。"

@@ -25,8 +25,8 @@ object Skills {
             Skill("終焔五重奏", "limit-flare", 480.0, 0.0, 0.0, 0.0, "HP1/3以下・各戦1回。全域に5連続の大爆発。")),
         Job.SUMMONER to listOf(
             Skill("巨人を呼ぶ", "giant", 96.0, 3.0, 65.0, 60.0, "12秒間、強い拳でボスを攻撃する仲間。"),
-            Skill("白ウサギを呼ぶ", "rabbit", 64.0, 3.0, 80.0, 45.0, "12秒間、2秒ごとに召喚士のHPを回復。"),
-            Skill("はにわを呼ぶ", "haniwa", 64.0, 1.25, 68.0, 40.0, "正面攻撃を軽減。出現中に再タップで殴る。"),
+            Skill("白ウサギを呼ぶ", "rabbit", 32.0, 3.0, 80.0, 45.0, "12秒間、2秒ごとに召喚士のHPを回復。"),
+            Skill("はにわを呼ぶ", "haniwa", 64.0, 1.25, 68.0, 40.0, "最長5秒、被ダメージ1回を肩代わりして消滅。再使用で殴る。"),
             Skill("五巨人の進軍", "limit-giants", 96.0, 0.0, 65.0, 0.0, "HP1/3以下・各戦1回。別枠で巨人を5体召喚。")),
         Job.THIEF to listOf(
             Skill("ナイフ", "knife", 100.0, .9, 59.0, 15.0, "小さな刃で素早く斬る、中威力の近接攻撃。"),
@@ -41,6 +41,7 @@ object Skills {
     fun range(job: Job, slot: Int, level: Int) = all.getValue(job)[slot].range * (1 + .6 * progress(level))
     fun arrowRadius(level: Int) = 6.0 * (1 + .6 * progress(level))
     fun auraRadius(level: Int) = 22.0 * (1 + .6 * progress(level))
+    fun summonDuration(kind: Int, level: Int) = if(kind==2) 5.0 else 12.0+8*progress(level)
     fun finisherDuration(job: Job, level: Int) = if(job==Job.SUMMONER) 12.0+8*progress(level) else if(job==Job.THIEF) 10.0 else 0.0
     fun rangeDetail(job: Job, slot: Int, level: Int): String = when {
         slot==3 && job==Job.WARRIOR -> "10連撃 / 距離に関係なく命中"
@@ -59,7 +60,7 @@ object Skills {
             Job.SUMMONER -> "拳 %.1f / 召喚 %.1f秒".format(java.util.Locale.ROOT,power(job,slot,level),finisherDuration(job,level))
             Job.THIEF -> "無敵10秒 / 各戦1回"
         }
-        val powerText = if (skill.power > 0) "威力 ${power(job, slot, level).roundToInt()}   " else "効果 ${(fraction(level) * 100).roundToInt()}%   "
+        val powerText = if (skill.power > 0) "${if(job==Job.SUMMONER && slot==1) "回復" else "威力"} ${power(job, slot, level).roundToInt()}   " else "効果 ${(fraction(level) * 100).roundToInt()}%   "
         return powerText + "待機 %.1f秒".format(java.util.Locale.ROOT, cooldown(job, slot, level))
     }
 }

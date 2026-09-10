@@ -44,17 +44,17 @@ class GameEngineTest {
         assertTrue(e.summons.isEmpty())
     }
     @Test fun rabbitHealsAndGiantAttacks() {
-        val e=battle(Job.SUMMONER); e.player.hp=25.0
+        val e=battle(Job.SUMMONER); e.player.hp=25.0; e.nextPattern=1000.0
         e.useSkill(1); e.gauge=100.0; e.useSkill(0); tick(e,2.0)
-        assertTrue(e.player.hp>25); assertTrue(e.damageDone>0)
+        assertEquals(33.0,e.player.hp,1e-8); assertTrue(e.damageDone>0)
     }
-    @Test fun haniwaOnlyProtectsFrontalAttacks() {
+    @Test fun haniwaAbsorbsOneHitAndVanishes() {
         val e=battle(Job.SUMMONER); e.useSkill(2); tick(e,.5)
-        val before=e.player.hp; e.hurt(40.0,e.boss.x,e.boss.y,true)
-        assertEquals(10.0,before-e.player.hp,.01)
-        e.invulnerability=.0; val hp=e.player.hp
-        e.hurt(40.0,e.player.x,e.player.y+100,true)
-        assertEquals(40.0,hp-e.player.hp,.01)
+        val before=e.player.hp; e.hurt(40.0)
+        assertEquals(before,e.player.hp,.0); assertEquals(0.0,e.damageTaken,.0)
+        assertTrue(e.summons.isEmpty())
+        e.hurt(40.0)
+        assertEquals(40.0,before-e.player.hp,.01)
     }
     @Test fun fourthSkillNoLongerHealsOrLocksMovement() {
         val e=battle(); e.player.hp=40.0; e.boss.hp=1e6; e.boss.maxHp=1e6

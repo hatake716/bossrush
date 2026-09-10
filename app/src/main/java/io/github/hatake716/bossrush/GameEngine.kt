@@ -275,7 +275,7 @@ class GameEngine(random: Random=Random.Default) {
                 2 -> { buffs["focus"]=5.0+4*Skills.progress(levels[2]); effect(PlayerEffectKind.FOCUS,player.x,player.y,Skills.auraRadius(levels[2]),levels[2]); sounds.add("focus") }
             }
             Job.SUMMONER -> if(haniwa) { damageBoss(power(2)); slash(PlayerEffectKind.HANIWA,2,"haniwa") } else {
-                val summon=Summon(slot,player.x+(if(summons.isEmpty()) -27 else 27),player.y-20,12.0+8*Skills.progress(levels[slot]),level=levels[slot])
+                val summon=Summon(slot,player.x+(if(summons.isEmpty()) -27 else 27),player.y-20,Skills.summonDuration(slot,levels[slot]),level=levels[slot])
                 summons.add(summon)
                 effect(listOf(PlayerEffectKind.SUMMON_GIANT,PlayerEffectKind.SUMMON_RABBIT,PlayerEffectKind.SUMMON_HANIWA)[slot],summon.x,summon.y,Skills.auraRadius(summon.level),summon.level)
                 sounds.add(when(slot) { 0 -> "summon-giant"; 1 -> "summon-rabbit"; else -> "summon-haniwa" })
@@ -397,16 +397,19 @@ class GameEngine(random: Random=Random.Default) {
         if(!trial && actual>.1) { particles.add(Particle(player.x,player.y-20,"+${actual.roundToInt()}",good=true)); sounds.add("heal") }
         if(actual>.1) effect(PlayerEffectKind.HEAL,player.x,player.y,Skills.auraRadius(level),level)
     }
-    fun hurt(amount: Double, sourceX: Double=boss.x, sourceY: Double=boss.y, frontal: Boolean=false) {
-        if(invulnerability>0 || isInvisible || screen!=Screen.BATTLE) return
+    fun hurt(amount: Double) {
+        if(amount<=0 || invulnerability>0 || isInvisible || screen!=Screen.BATTLE) return
+        val haniwa=if(job==Job.SUMMONER) summons.firstOrNull { it.kind==2 && it.life>0 } else null
+        if(haniwa!=null) {
+            // Consume exactly one guardian. A separate hit may hurt immediately afterwards.
+            summons.remove(haniwa)
+            effect(PlayerEffectKind.HANIWA,haniwa.x,haniwa.y,24.0,haniwa.level)
+            particles.add(Particle(player.x,player.y-25,"身代わり",good=true))
+            sounds.add("haniwa"); notify("はにわが身代わりになった！")
+            return
+        }
         var reduction=if((buffs["armor"] ?: 0.0)>0) .5 else 1.0
         if((buffs["shield"] ?: 0.0)>0) reduction*=1-.75*Skills.fraction(levels[1])
-        val haniwa=summons.firstOrNull { it.kind==2 }
-        if(frontal && haniwa!=null) {
-            val sourceAngle=atan2(sourceY-player.y,sourceX-player.x)
-            val guardAngle=atan2(haniwa.y-player.y,haniwa.x-player.x)
-            if(cos(sourceAngle-guardAngle)>.55) { reduction*=.25; notify("はにわが正面を守った！") }
-        }
         val actual=min(player.hp, amount*reduction)
         player.hp-=actual; damageTaken+=actual; invulnerability=.5
         particles.add(Particle(player.x,player.y-25,"−${actual.roundToInt()}")); sounds.add("hurt")
@@ -472,7 +475,7 @@ class GameEngine(random: Random=Random.Default) {
         advancePlayerFinisher(dt)
         if(screen!=Screen.BATTLE) return
         for(s in summons.toList()) {
-            s.life-=dt; s.timer-=dt
+            s.life=(s.life-dt).let { if(it<1e-9) 0.0 else it }; s.timer-=dt
             if(s.life<=0) continue
             val angle=atan2(boss.y-player.y,boss.x-player.x)
             val formationAngle=PI/2+s.formation*2*PI/5
@@ -548,7 +551,7 @@ class GameEngine(random: Random=Random.Default) {
                 if(motion!=null && motion.anchor===h && h.time>=h.delay) {
                     if(!motion.hitPlayer && BossMobility.segmentDistance(bossOldX-playerOldX,bossOldY-playerOldY,boss.x-player.x,boss.y-player.y)<h.b/2+7) {
                         motion.hitPlayer=true
-                        hurt(bossDamage()*h.multiplier,bossOldX,bossOldY,true)
+                        hurt(bossDamage()*h.multiplier)
                     }
                     if(h.time>=h.delay+h.duration) {
                         h.resolved=true
@@ -569,7 +572,7 @@ class GameEngine(random: Random=Random.Default) {
                         val nx=player.x+cos(angle)*h.a; val ny=player.y+sin(angle)*h.a
                         if(nx<16 || nx>584 || ny<20 || ny>318) hurt(bossDamage()*h.multiplier*1.5)
                         player.x=nx.coerceIn(16.0,584.0); player.y=ny.coerceIn(20.0,318.0)
-                    } else hurt(bossDamage()*h.multiplier,h.sourceX,h.sourceY,h.shape=="cone" || h.shape=="line")
+                    } else hurt(bossDamage()*h.multiplier)
                 } else if(h.shape=="tower") { notify("ルーンを受け止めた！"); sounds.add("buff") }
             }
         }
