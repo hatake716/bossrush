@@ -13,7 +13,7 @@ class GameEngineTest {
         assertEquals(32,Bosses.all.size)
         assertEquals(32,Bosses.all.map { it.id }.toSet().size)
         assertEquals(32,Bosses.all.map { it.ultimate }.toSet().size)
-        assertEquals(32,BattleScore.themes.map { it.phraseA to it.phraseB }.toSet().size)
+        assertEquals(32,BattleScore.themes.map { it.id to it.character }.toSet().size)
         assertTrue(Bosses.all.all { it.sequence.size>=2 && it.attacks.size==it.attackNames.size && it.hint.isNotBlank() })
     }
     @Test fun everySkillHasLinearPowerRangeAndCooldownAndA16LevelCap() {

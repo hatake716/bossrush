@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "sample_rate": 44100,
   "channels": 2,
   "silent_scenes": [
@@ -22,7 +22,7 @@
       "bpm": 204,
       "beats": 4,
       "root": 64,
-      "character": "枝を跳ぶ高音と、伝言を返す短い応答",
+      "character": "枝跳びの高音スタッカートと、休符を挟む伝言の応酬",
       "file": "ratatoskr.ogg",
       "bars": 24,
       "frames": 1245176,
@@ -35,17 +35,20 @@
         "i",
         "i"
       ],
-      "sha256": "5a2f5a53371cfc458b760452b4578871afe0fd8e8e89ec8b7e75410f8833012f",
-      "midi_sha256": "3d290ce702b06b178c0e80ac99294ca8bfbb1bb02a361da45a1a70f0d66aba2e",
+      "sha256": "8c231cc83e2307f0ad3d9626e08a93bf68b63d94a166e7bd5f71cee74965554d",
+      "midi_sha256": "9dd2546e482c82369b9768af1656e012538f75fd7e861310437c683e338dbf10",
       "target_lufs": -15,
-      "note_count": 1925,
+      "note_count": 1273,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "ABaBXY",
+      "score_sha256": "169e4fda6f949c9727f39de61646ce71035bb478462a8c9760c21f7dea885a53"
     },
     {
       "id": "dainn",
@@ -54,7 +57,7 @@
       "bpm": 192,
       "beats": 4,
       "root": 60,
-      "character": "枝葉を揺らす角笛と、四本の蹄の拍動",
+      "character": "森に響く付点の角笛、長く歌う旋律と四つ打ちの蹄",
       "file": "dainn.ogg",
       "bars": 24,
       "frames": 1323000,
@@ -67,17 +70,20 @@
         "i",
         "i"
       ],
-      "sha256": "30f3a89dbd065411e29ad1e006b73f004bef7cde22b2fb796d021b6fa9402e5e",
-      "midi_sha256": "6c47c83432e4ba8d0c875dfad7be7dc1b8e270ea82fcd4f39aabd9de00c7c5ee",
+      "sha256": "f8ab6d2750da0e28e0d51ea433fab471a8d000e7e79105297c23a464f55fb6da",
+      "midi_sha256": "a2e785b9c9ba86ec2482e898368e02a528586ee4a542c4fbab651c405ddb18c1",
       "target_lufs": -15,
-      "note_count": 1925,
+      "note_count": 1034,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "AaBBYX",
+      "score_sha256": "cce8c56970abb89f98d272cacf14aa140518e1b70a2376553d1adfe4af2cb18e"
     },
     {
       "id": "gullinbursti",
@@ -86,7 +92,7 @@
       "bpm": 208,
       "beats": 4,
       "root": 62,
-      "character": "金毛の輝く上昇句と、猪の突進ベース",
+      "character": "黄金のファンファーレと、短長短で突進するギャロップ",
       "file": "gullinbursti.ogg",
       "bars": 28,
       "frames": 1424769,
@@ -99,17 +105,20 @@
         "i",
         "i"
       ],
-      "sha256": "8e707ac2821d2013d4cd04b8e1ca6d073f69547c8932254483e608c169f599ef",
-      "midi_sha256": "71665025935e9d5ace9227973e25484942aaf1ee3b49fb7b0e0eaa7539ae5d49",
+      "sha256": "df80826c5671f88d9b19a09ef497dee40275a48e4c60d3b0af89c41d4b724b6e",
+      "midi_sha256": "a87d87e104bb37d9b1a2a0ac719006f30041cec4f9a5c3b1d060b2bd7e52d03b",
       "target_lufs": -15,
-      "note_count": 2269,
+      "note_count": 2202,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "ABAXbYX",
+      "score_sha256": "50439484140746e8acbffe9714812da18f03cbea09db5402111054e56d30d9df"
     },
     {
       "id": "hugin",
@@ -118,7 +127,7 @@
       "bpm": 212,
       "beats": 4,
       "root": 65,
-      "character": "問い掛ける鴉の跳躍と、鋭い返答",
+      "character": "鋭い上方跳躍の問い、沈黙の後に返る低い答え",
       "file": "hugin.ogg",
       "bars": 28,
       "frames": 1397887,
@@ -131,17 +140,20 @@
         "i",
         "i"
       ],
-      "sha256": "4a3f9f2306376aef34db38c78640664e2a9da8642b1166173b24f071593b7998",
-      "midi_sha256": "d68d7a1ff0d1bbdb2b2ccc7318d8d6228e34e567d346233303e6a1b3785a6d11",
+      "sha256": "c2bb544b5700511fb3a4a66e7920411f0e431ac844916c1d52d0999ccb5783b0",
+      "midi_sha256": "027137035b8d8b030dd929ef55c777a8d415e1c1200106fb31b4b24620705816",
       "target_lufs": -15,
-      "note_count": 2325,
+      "note_count": 1262,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "AbABXYX",
+      "score_sha256": "e90c318e8e35f03007d16fef5d75caac77b9646d85474b55aa76459b9add79d6"
     },
     {
       "id": "munin",
@@ -150,7 +162,7 @@
       "bpm": 200,
       "beats": 4,
       "root": 57,
-      "character": "記憶の旋律を一拍遅れで追う二声",
+      "character": "記憶を辿る下行の歌、後半で追いかけるピアノの輪唱",
       "file": "munin.ogg",
       "bars": 24,
       "frames": 1270080,
@@ -163,17 +175,20 @@
         "i",
         "i"
       ],
-      "sha256": "2cc36f7f935c97520254fad5e787d75fd18ad4bc960b76adb39bd213b2cbd2ab",
-      "midi_sha256": "3fb8ccf2351a75aa509ce18979f166d9667badc2dc7369533ca551d174659280",
+      "sha256": "3ece5feaa4144059f73e39e359026319a92256cd04c7b0f900d4caf8629bdba7",
+      "midi_sha256": "e8f666b2e4f8943dac04a65febf5e6f8a0c248f09c8e451421ceb1f3a7aab7e7",
       "target_lufs": -15,
-      "note_count": 1973,
+      "note_count": 948,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "AaBAYX",
+      "score_sha256": "6bfdf78a2512976a8b7ed1e15e70715b428f08e05e5a5bde8e0456a08aa94b37"
     },
     {
       "id": "tanngrisnir",
@@ -182,7 +197,7 @@
       "bpm": 216,
       "beats": 4,
       "root": 60,
-      "character": "雷車の蹄を刻む二連打と低い角笛",
+      "character": "二打ずつ跳ねる雷車の蹄、低音ユニゾンとタムの疾走",
       "file": "tanngrisnir.ogg",
       "bars": 28,
       "frames": 1372000,
@@ -195,17 +210,20 @@
         "i",
         "i"
       ],
-      "sha256": "5d2e84045f22e4785603371600e1746f5581b6a6bf406be9119696597d44c5a1",
-      "midi_sha256": "896cffe73fa8b3de25bcaa54a63382a66e06806df6eae0ba355934279aa9d2de",
+      "sha256": "4bca2b6a06c48e99afecefb157229ecbe5d96f92bbd4e30a423769e3866fc274",
+      "midi_sha256": "99ca6685277b696a684cfb703229f3a405d015b69127280b2558946813d46e45",
       "target_lufs": -15,
-      "note_count": 2365,
+      "note_count": 1839,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "AABbXYX",
+      "score_sha256": "ea2fff63c31c98c158046e5910191a482042d30858f6c5e52c56f6d43a1cbdbe"
     },
     {
       "id": "skoll",
@@ -214,7 +232,7 @@
       "bpm": 224,
       "beats": 4,
       "root": 62,
-      "character": "太陽へ駆け上がる音列と追跡の連打",
+      "character": "太陽を追う上行の反復、息継ぎの短い高速パンク",
       "file": "skoll.ogg",
       "bars": 28,
       "frames": 1323000,
@@ -227,17 +245,20 @@
         "i",
         "i"
       ],
-      "sha256": "94d53eb9abb6c7fe19cb44e1c065840c73050038e864a929fe0e4919547b9b89",
-      "midi_sha256": "02f81c34c455a7ea4f294bbe12b05648cc2a41133074e0aa6313e674fb3902f3",
+      "sha256": "f15e86546b9886ac16e03e1ea81d973e1d11c2079c4ac8c6da2b312db3fcd1cf",
+      "midi_sha256": "866d9abe2f09575ad05780fe099f728b24f7037b8fd5d5160a626faa3c3583ff",
       "target_lufs": -15,
-      "note_count": 2365,
+      "note_count": 2491,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "ABABXYX",
+      "score_sha256": "3001f362402f88cca46720b0d6170fb119948391297810e70cecd96a42b2ef07"
     },
     {
       "id": "hati",
@@ -246,7 +267,7 @@
       "bpm": 220,
       "beats": 4,
       "root": 59,
-      "character": "月へ回り込む下降句と裏拍の追走",
+      "character": "月を巡る裏拍の長い下行旋律、重いハーフタイム",
       "file": "hati.ogg",
       "bars": 28,
       "frames": 1347055,
@@ -259,17 +280,20 @@
         "i",
         "i"
       ],
-      "sha256": "7b5275b5897989298fd35f5e861e8ac2f2df26d1d245489e9588a112adb920f6",
-      "midi_sha256": "e73cb49a7a8f44b0b40014f840c777b6a01e218274c48d70c824d487fc4e336f",
+      "sha256": "1c64c7e882b60a3814153c2aa8914eb7a38b5691ad6d8c1fd21496d991bbdda2",
+      "midi_sha256": "ec40ec83f79f83b07832e90339e2fdc228c22a405a0c1b32c0210158018bdb09",
       "target_lufs": -15,
-      "note_count": 2365,
+      "note_count": 1217,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "AabBXYX",
+      "score_sha256": "fed735d738823e32f0853b984e997316aab61d7f660d8643fe228a03597cc626"
     },
     {
       "id": "hraesvelgr",
@@ -278,7 +302,7 @@
       "bpm": 200,
       "beats": 4,
       "root": 55,
-      "character": "羽ばたく長い旋律と、北風を描く弦の残響",
+      "character": "巨大な翼の二小節ロングトーン、広がる弦と開放ギター",
       "file": "hraesvelgr.ogg",
       "bars": 24,
       "frames": 1270080,
@@ -291,17 +315,20 @@
         "i",
         "i"
       ],
-      "sha256": "fa4f5e26894aba32d6fd3ce535f92f53b61d01fda6d7de69bf6904639a951830",
-      "midi_sha256": "ae72e3e712c9b0b244e9e757fe2aecb26381fe49c4a3b58dae932b49b7c44a0c",
+      "sha256": "a83196939cdf8296d97efd2c11dbe1012acbc010b0eb1387af740a0e6fcd5fec",
+      "midi_sha256": "ae2315e917dd76ebbdf9d4b35675375214765e113ec37c06f8e6c02b05545d8c",
       "target_lufs": -15,
-      "note_count": 1205,
+      "note_count": 554,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "AaBbXY",
+      "score_sha256": "029ab9d586e39a93bbbdc9bba9e54dc61b7d853bd3ccbca2967fd8bd79388626"
     },
     {
       "id": "thjazi",
@@ -310,7 +337,7 @@
       "bpm": 208,
       "beats": 4,
       "root": 57,
-      "character": "急降下する翼と、奪われた春の高音",
+      "character": "翼の急降下を描く連続下降、春を奪う低音の切り返し",
       "file": "thjazi.ogg",
       "bars": 28,
       "frames": 1424769,
@@ -323,17 +350,20 @@
         "i",
         "i"
       ],
-      "sha256": "f5df21e64a6f242997905fbe3d698c39da5ac03779a673e952953f6ff2c2043a",
-      "midi_sha256": "e75621ec588d3f275534c03a963f2ae0967bc98b036d4502cd644cfab17a1dca",
+      "sha256": "268715b4124c359e0971fb2d052f879edd75bf4f0e6ad4804bfb3351717cab8f",
+      "midi_sha256": "6a9efb2c7fd2c475370e166d35397ecd1a3d902a7a63953e0b1c0533fe1872c9",
       "target_lufs": -15,
-      "note_count": 1405,
+      "note_count": 1545,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "ABaAXYX",
+      "score_sha256": "171a7200415649c4de34445dc8e10e24b9633fe8a8624f4bf8f97b3b23862093"
     },
     {
       "id": "skadi",
@@ -342,7 +372,7 @@
       "bpm": 216,
       "beats": 4,
       "root": 66,
-      "character": "氷の短音と、矢のような高音の跳躍",
+      "character": "氷を射抜く離れた高音、鋭い空白と細い結晶の連打",
       "file": "skadi.ogg",
       "bars": 28,
       "frames": 1372000,
@@ -355,17 +385,20 @@
         "i",
         "i"
       ],
-      "sha256": "eba727eb8a2c13294b86e27a6fa8f4a2ea98e61036296581a8722f1d460139de",
-      "midi_sha256": "06be742bab756ca49fca9bea76577f42279d8514354b89e5f716b832f736caaa",
+      "sha256": "cea0769cfa6873f975555813a05353f489de2f56139fe43789abb8609d58697c",
+      "midi_sha256": "1c5c4f02b5e0fa536473dce9a625326cf2c47bbdc624a78841820a987f05189d",
       "target_lufs": -15,
-      "note_count": 2269,
+      "note_count": 1360,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "ABbAXYY",
+      "score_sha256": "e47545bd281208ad743afe74a5ec66124ad6ceab799cfd53cc7dfc348006f128"
     },
     {
       "id": "ullr",
@@ -374,7 +407,7 @@
       "bpm": 204,
       "beats": 4,
       "root": 64,
-      "character": "弦を弾く短い音と、誓いを告げる上昇句",
+      "character": "弓を引く溜めと矢の三連音、跳ねる弦のロック",
       "file": "ullr.ogg",
       "bars": 24,
       "frames": 1245176,
@@ -387,17 +420,20 @@
         "i",
         "i"
       ],
-      "sha256": "e3c946693c099de7f8edfc19ee687180ba0998f1a02bb553394d00a143c0abc4",
-      "midi_sha256": "79c4c2ef9aec8402cc344e1fb6912a16992368045e888392febdadc3b20181e9",
+      "sha256": "e88a2670358bfd42a10048da6b63b324cfbbdaca339114ddb00afd30c5d59b0e",
+      "midi_sha256": "65f0abeab97d3b30799fd85e1eed382b61f71065d49d7f3902d01760204ce7e0",
       "target_lufs": -15,
-      "note_count": 1925,
+      "note_count": 1330,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "ABAaYX",
+      "score_sha256": "aba98f570c90f360501e3459b783bed1371392131952640344c8a2de5c8c3fab"
     },
     {
       "id": "aegir",
@@ -406,7 +442,7 @@
       "bpm": 196,
       "beats": 4,
       "root": 50,
-      "character": "荒波の上下運動と、宴の三連アクセント",
+      "character": "宴の三連シャッフル、波を跨ぐ大きな上下の旋律",
       "file": "aegir.ogg",
       "bars": 24,
       "frames": 1296000,
@@ -419,17 +455,20 @@
         "i",
         "i"
       ],
-      "sha256": "abd391fa58f05582381b5cb98604fcbffd05ceafc19256d2aa84a59f82153a23",
-      "midi_sha256": "f0f60b3fc9a31d2c2625e8a32205f124fcc3262203d237676353d011666d7b5b",
+      "sha256": "27fa13c4071dd65f9ca83be28b9cb11a871d2b7f7e8abfa34ebd285609e9b1c5",
+      "midi_sha256": "9263cd413a48f7e99f87557a07e69d618647b77219fea3eaeeb38d0ef9c7770a",
       "target_lufs": -15,
-      "note_count": 2045,
+      "note_count": 1807,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "ABaBYX",
+      "score_sha256": "4d4718909218466e8b264c1af354ac07806a6b911de38425992eb3c84aadef44"
     },
     {
       "id": "ran",
@@ -438,7 +477,7 @@
       "bpm": 208,
       "beats": 4,
       "root": 53,
-      "character": "絡みつく二声の網と、沈む低音",
+      "character": "半拍ずれで絡む網の旋律、沈降ベースと二声ピアノ",
       "file": "ran.ogg",
       "bars": 28,
       "frames": 1424769,
@@ -451,17 +490,20 @@
         "i",
         "i"
       ],
-      "sha256": "b570449b038c21fcf7bb6993bb2a3e6c5f8e897b5315b14bbb2813d818cf69ef",
-      "midi_sha256": "50e9beb758ac4c758c9e9b1e16d7ff6f26531b15eb776a35fb0fae6889987fec",
+      "sha256": "25036707f8a4ff5beafe886b5c21219def6ac30865c120ea6bd181b6323dbcf5",
+      "midi_sha256": "b6509272d66e09c98df969955cc776176a4303c32b28fbfe768b534f04082de9",
       "target_lufs": -15,
-      "note_count": 2409,
+      "note_count": 1513,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "ABbaXYX",
+      "score_sha256": "829bf6bad19316ed4ce4982b2c65189d78aea8247d7fc5772176e2de428184e2"
     },
     {
       "id": "njord",
@@ -470,7 +512,7 @@
       "bpm": 200,
       "beats": 4,
       "root": 60,
-      "character": "帆を押す上昇音と、航路を刻む低音",
+      "character": "帆を広げる上向きの長音、明快な四つ打ちと開放和音",
       "file": "njord.ogg",
       "bars": 24,
       "frames": 1270080,
@@ -483,17 +525,20 @@
         "i",
         "i"
       ],
-      "sha256": "603bae5ed693ec3b5b8826a93ebe1d3a79b9d27ad0060556b362dc5e7cbdc455",
-      "midi_sha256": "4de127aa29c5900c273598120139e16be44ac70e8460335a6984abe8145e8318",
+      "sha256": "013a19c4c3ffd397d331658f95f517744be102fdd7bc24cddca3adcab704d8ac",
+      "midi_sha256": "bf1aacab8a4253948e86b0bd52ff5a6cd8a68fe16c74c0dd4952d831483ff18f",
       "target_lufs": -15,
-      "note_count": 1205,
+      "note_count": 1060,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "ABaBXX",
+      "score_sha256": "fcbdd15c1d4fd0ed9ec58bdc0fa111c25acf8f9b8777a6ef8acd90621f9e24f2"
     },
     {
       "id": "jormungandr",
@@ -502,7 +547,7 @@
       "bpm": 224,
       "beats": 4,
       "root": 48,
-      "character": "尾に戻る循環旋律と、世界を締める低音",
+      "character": "同じ音へ巻き戻る蛇の円環、低域の反復と圧迫する刻み",
       "file": "jormungandr.ogg",
       "bars": 28,
       "frames": 1323000,
@@ -515,17 +560,20 @@
         "i",
         "i"
       ],
-      "sha256": "00b2f6965ea5bfd312ed0762bf57c271037d435bcfdf3b80ddd24f15fafc308b",
-      "midi_sha256": "32ab346d9605cd4d5ab6be67b99687372caef8371038807ee29b694e5ce535a8",
+      "sha256": "c44d85eb1a77e1e136c5ec669ee1008f66c874436574d228f3603cc6b1269a6b",
+      "midi_sha256": "fed7e2e3661f4fb8a04f165eb86a24213abac85837393eac8060b16f74ecca68",
       "target_lufs": -15,
-      "note_count": 2317,
+      "note_count": 2163,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "AABaYXY",
+      "score_sha256": "63f23a8c51757e22b2551c16c9bf1b2aead6599e3b840fca364178980dd5ab1d"
     },
     {
       "id": "garmr",
@@ -534,7 +582,7 @@
       "bpm": 220,
       "beats": 4,
       "root": 52,
-      "character": "番犬の吠える低音と鎖を叩く裏拍",
+      "character": "三度吠えて途切れる低音、鎖を打つ裏拍のスネア",
       "file": "garmr.ogg",
       "bars": 28,
       "frames": 1347055,
@@ -547,17 +595,20 @@
         "i",
         "i"
       ],
-      "sha256": "bf0b6ac7c6094393d4c5d8000369d88cc2d9d57640817d130dd1f952aa5a1487",
-      "midi_sha256": "db4febdbab2de54517bc1451fd36b49a6b02be7ded5a424ce6e308c3f3ce6a45",
+      "sha256": "d6707e423b89071c052be736c11d30c5269ba09489124b4aeaf32ff052b35034",
+      "midi_sha256": "b21f80b69ddfc20f6681ad41bda32ce015b74cf2284fadfafb79f7ae0e80557e",
       "target_lufs": -15,
-      "note_count": 2365,
+      "note_count": 1564,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "ABAbXXY",
+      "score_sha256": "414a54dfe603e021d1208e70b8d96e917d071af9df622a9f1121a69fab0fb71b"
     },
     {
       "id": "hel",
@@ -566,7 +617,7 @@
       "bpm": 192,
       "beats": 4,
       "root": 57,
-      "character": "高音と低音を交互に鳴らす二つの顔",
+      "character": "高音の嘆きと低音の返答、長く伸ばす哀歌と葬送の鼓動",
       "file": "hel.ogg",
       "bars": 24,
       "frames": 1323000,
@@ -579,17 +630,20 @@
         "i",
         "i"
       ],
-      "sha256": "e59d99c3993d843f91364010c9eb2dbc8f34939647cd388ccdff197cd2af3393",
-      "midi_sha256": "bb1e668d73eca6ff62a023ff2cec4da35edaf60f0e5d4ee9e55b259c5fd53ede",
+      "sha256": "0babc75b651e1d143ec9b978430d6434fb97b3cf5dc6273d6a96f49ab0878870",
+      "midi_sha256": "1f9c26a15c355fc1fa71712552adde985466bcb6a43b5c78c2c5770b12272c11",
       "target_lufs": -15,
-      "note_count": 1229,
+      "note_count": 510,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "AaBbYX",
+      "score_sha256": "dfae54b16d3a8847bcdd0fc8c13fc12c27551e1fee4c50b62cbdb98901a456a4"
     },
     {
       "id": "nidhogg",
@@ -598,7 +652,7 @@
       "bpm": 224,
       "beats": 4,
       "root": 49,
-      "character": "根を齧る断続音と下へ崩れる音列",
+      "character": "根を噛む細かい同音連打と、階段状に崩れる低い旋律",
       "file": "nidhogg.ogg",
       "bars": 28,
       "frames": 1323000,
@@ -611,17 +665,20 @@
         "i",
         "i"
       ],
-      "sha256": "e5f486adcf6d42cc824951008b4fa75d4b418b2f3a445a8fe5a4e407a7e53a2b",
-      "midi_sha256": "26981bdc7eabfa19b3e42382c21ddd2e635bc420402addc5996e67101e9ee257",
+      "sha256": "32e418c5af89d2314fd6475b6ab56362f287bffa04ff6c3767459e0acb82b227",
+      "midi_sha256": "a12dbe90899dd2b80f53033c1bfda56d431a9beeba41df6eecfae1090a98ee91",
       "target_lufs": -15,
-      "note_count": 2317,
+      "note_count": 2298,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "ABAbYXX",
+      "score_sha256": "6b3408c53d06a2f8efef6fb588cfdcab2a2ce60ed608377a1488b7988bae7134"
     },
     {
       "id": "fenrir",
@@ -630,7 +687,7 @@
       "bpm": 228,
       "beats": 4,
       "root": 50,
-      "character": "鎖を断つ休符明けの強打と獣の連打",
+      "character": "鎖を切る全員休符、直後のオクターブ強打と重いブレイク",
       "file": "fenrir.ogg",
       "bars": 28,
       "frames": 1299789,
@@ -643,17 +700,20 @@
         "i",
         "i"
       ],
-      "sha256": "6f77c03e68259d57654aedc062b04c37a8813c2e8c4c20d7eefcd385b6cee11a",
-      "midi_sha256": "fde6e2a076701f42c6b8103fe31948e3d1490768144123eb2ffe6aca5ead9078",
+      "sha256": "225966efb16cc949f70addf6d37e496b7e0b543bea02d61b6d83c089255b670f",
+      "midi_sha256": "4294fd300d66ee54408aa40f8005b90ba91870dafa83bbabd56cf167d66791f5",
       "target_lufs": -15,
-      "note_count": 2272,
+      "note_count": 1050,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "AABbXYX",
+      "score_sha256": "78b777baabc91634cdab111159251a211e0c078300f83f3d3968cc2a3e627766"
     },
     {
       "id": "hrungnir",
@@ -662,7 +722,7 @@
       "bpm": 208,
       "beats": 4,
       "root": 48,
-      "character": "石心の三打アクセントと砥石の低音",
+      "character": "三角の石心を刻む3＋3＋2、低い三音の旋律",
       "file": "hrungnir.ogg",
       "bars": 28,
       "frames": 1424769,
@@ -675,17 +735,20 @@
         "i",
         "i"
       ],
-      "sha256": "2469acee62aa88e1c30827e218f8c9c7aa9fe04bcfd165fde148f13ae95e8244",
-      "midi_sha256": "50324ffd19329fce09a0d7543c651a62626e426b1de79dbf3aa790785269ad13",
+      "sha256": "42658be99dd94b0dd00e7c0a5424d763ed529c77b93473c449c7b86392e51f93",
+      "midi_sha256": "6d2c1d7d52c3e671b200347cc452de3b5d42d2ca96d2595c66ac270db3698e88",
       "target_lufs": -15,
-      "note_count": 1733,
+      "note_count": 1203,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "AaABYXY",
+      "score_sha256": "21b51a744d6f6c08133b21b35a9cf28520038f617fbeedc135fa3e2295af72f1"
     },
     {
       "id": "thrym",
@@ -694,7 +757,7 @@
       "bpm": 204,
       "beats": 4,
       "root": 51,
-      "character": "霜の婚礼を刻む重い行進と凍る残響",
+      "character": "付点の婚礼行進から荒い酒宴へ、低音の霜王ファンファーレ",
       "file": "thrym.ogg",
       "bars": 24,
       "frames": 1245176,
@@ -707,17 +770,20 @@
         "i",
         "i"
       ],
-      "sha256": "1b9da04c0ddee45d095e3df74fc143b2e4b9420a72122121f524f42277935227",
-      "midi_sha256": "62c8c876c49726bbb3a2757140ee46f5da1061990ad13027642afe4f609b9b98",
+      "sha256": "6c016c7df7a8f2b86099085d46490b9bdf9b7de0b2180e5342e4582020fb2e3f",
+      "midi_sha256": "ed3eaf6a1f5f727e6bc82b632ab946e1141832c96156b8d22e7d0f92003b9e4f",
       "target_lufs": -15,
-      "note_count": 1485,
+      "note_count": 1155,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "AABbYX",
+      "score_sha256": "89ce5d49237c89edcf4216277ffab6e081beadbb8093a157435dacb93eb5e5da"
     },
     {
       "id": "utgardloki",
@@ -726,7 +792,7 @@
       "bpm": 224,
       "beats": 4,
       "root": 61,
-      "character": "音色を入れ替える幻術とずれる拍頭",
+      "character": "拍頭を逃げる幻術、3・5・7個の音群でずれるピアノ",
       "file": "utgardloki.ogg",
       "bars": 28,
       "frames": 1323000,
@@ -739,17 +805,20 @@
         "i",
         "i"
       ],
-      "sha256": "0f0e619f9a3bf673cdbdf072faa07be9a13285afeca6117c256f59d7a0abab92",
-      "midi_sha256": "af396ea504edf27b741d8a2091a900d35eaa0e3953ea0ebbe348f7ed5ecfa988",
+      "sha256": "339c79296f22383695af784244b35989e6f6a9979ec28efcfe49e3bd6fc70e37",
+      "midi_sha256": "efd9f6b700ef10ff412cbac6802505d5ded9ebbec971aaceff6501e32655a265",
       "target_lufs": -15,
-      "note_count": 1765,
+      "note_count": 1531,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "AbBaXYX",
+      "score_sha256": "386a4b1dbda8b33fd2e9ca73a786a92a5e39aa3db9821ff219d833992bb4f77c"
     },
     {
       "id": "surtr",
@@ -758,7 +827,7 @@
       "bpm": 232,
       "beats": 4,
       "root": 52,
-      "character": "炎剣が駆け上がる音列と燃え続ける連打",
+      "character": "高音まで駆け上がる炎の奔流、切れ目のないパワーメタル",
       "file": "surtr.ogg",
       "bars": 28,
       "frames": 1277379,
@@ -771,17 +840,20 @@
         "i",
         "i"
       ],
-      "sha256": "6f7dc2b6c8758ec18115e59d111cabe2e228c42ab65f0d7b7f5bca11b2a484ad",
-      "midi_sha256": "cc34c0874de206a8f3cb2624fdcacff31e70a4cf2539cf6d1183739836ab274f",
+      "sha256": "506ac1cb7a185e415b61b5b0cc8a502dfffaf8dd687e38c5e3ece57f3df8a49b",
+      "midi_sha256": "abf770a8c1b84ee03da74a7f0caf79a5846698175cc7966304bd1ec1ddd04f92",
       "target_lufs": -15,
-      "note_count": 2383,
+      "note_count": 3056,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "ABAXYXY",
+      "score_sha256": "68dbb58a4df5e26d9de69ad9cb67209df02e22df50e2482a416f108fd3244fb0"
     },
     {
       "id": "idunn",
@@ -790,7 +862,7 @@
       "bpm": 204,
       "beats": 4,
       "root": 67,
-      "character": "芽吹く高音の装飾と、林檎を守る切迫感",
+      "character": "芽吹く短い前打音と歌う長音、明るい跳ね方のピアノロック",
       "file": "idunn.ogg",
       "bars": 24,
       "frames": 1245176,
@@ -803,17 +875,20 @@
         "i",
         "i"
       ],
-      "sha256": "fc0d53ab65502bb98509dcd150be215c1edab07d30f3a488f0ede9bab8039a62",
-      "midi_sha256": "9b8078619c919cb59e819d02f5b4da98a878c782421929cd69ea02fa4766f163",
+      "sha256": "c10078c9c4bfd21a15828f164c6399738d80947e34ed61c08285a07533d83445",
+      "midi_sha256": "6f9b7860e2ccd37d2a27a344df39fdac102da142358af3a43a52c5a6496e878c",
       "target_lufs": -15,
-      "note_count": 1925,
+      "note_count": 1243,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "ABaYXY",
+      "score_sha256": "602721128f79a0b301031379e341aa0d03a7588ca3e59f72d3000755cabe8b86"
     },
     {
       "id": "freyr",
@@ -822,7 +897,7 @@
       "bpm": 216,
       "beats": 4,
       "root": 62,
-      "character": "鹿角の上昇句と自ら踊る剣の分散和音",
+      "character": "自ら踊る剣の六連アルペジオ、鹿角の跳躍と軽快なリフ",
       "file": "freyr.ogg",
       "bars": 28,
       "frames": 1372000,
@@ -835,17 +910,20 @@
         "i",
         "i"
       ],
-      "sha256": "55316101f6de8fe84d21f8e56ee9383c6357f33509ff8307c7593a110dba297d",
-      "midi_sha256": "fa69d27a8fecabad708546cbae5e02c70ffce05cbe6ddb07cd0d248b1997bca7",
+      "sha256": "6570bdfb7b53336196d3c292a7bafcb367efc529882aaf3a641a9d33a4413505",
+      "midi_sha256": "d9410efa596847addde7f901dbd2005cab92c40e3e72bbfd7f5c81578cd36bfd",
       "target_lufs": -15,
-      "note_count": 2269,
+      "note_count": 2097,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "ABbAXYX",
+      "score_sha256": "0eb0a006d42a9b9d66ca7c6300f9305a2377891fb7063171f3126160c10fb9b4"
     },
     {
       "id": "freyja",
@@ -854,7 +932,7 @@
       "bpm": 220,
       "beats": 4,
       "root": 65,
-      "character": "黄金の装飾音と、セイズの呪文の応答",
+      "character": "黄金の涙を落とす装飾下降、歌うセイズと舞踏の裏拍",
       "file": "freyja.ogg",
       "bars": 28,
       "frames": 1347055,
@@ -867,17 +945,20 @@
         "i",
         "i"
       ],
-      "sha256": "6e3afa30cdb1103f5f74646ff901dd20e4cd890c1efe854f05aa040b27dcb28d",
-      "midi_sha256": "5125a2ed6e39004d4933d340842f036d043c43c2fb4d0ab3d2255315980e23a2",
+      "sha256": "1c43dbc353ccdb32235ba90a0e584b248846d9a0c1de1276333088b531726ef2",
+      "midi_sha256": "de00c2da16b3a790e33c091487755b4fb8e5642baf7953d84bd36ebec1e454f3",
       "target_lufs": -15,
-      "note_count": 2325,
+      "note_count": 1604,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "ABaBYXY",
+      "score_sha256": "816649a69cc4c31e721b81ebe3a7db05002d93f30a048df97cf1fccc7b43c3c5"
     },
     {
       "id": "tyr",
@@ -886,7 +967,7 @@
       "bpm": 216,
       "beats": 4,
       "root": 60,
-      "character": "誓いの行進、片腕を表す一拍の空白",
+      "character": "誓いの行進と四度の呼び声、片腕を示す一拍の空白",
       "file": "tyr.ogg",
       "bars": 28,
       "frames": 1372000,
@@ -899,17 +980,20 @@
         "i",
         "i"
       ],
-      "sha256": "bf917fd9f8de5fd8da198b3cf0f9e1c0e5e7a9a8a10ae379f8f2f25f72c9e44f",
-      "midi_sha256": "56d2b728484615aca45754c500f243e322943059ca6afd26d86ad01f38b2952f",
+      "sha256": "61b75f1f12ff12405a3d56bd10878ddca9914555f83a4a1eff5e170cd90fabf6",
+      "midi_sha256": "a7139157b013ad05f523a06e43aa516830ce742c8c2487d6ceb30585b2cde9c9",
       "target_lufs": -15,
-      "note_count": 2168,
+      "note_count": 1387,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "AABaXYX",
+      "score_sha256": "f1d73ae9fd24294896c70ca6581ddfd14d9aceb5b4ac23b9ef54701b146ca003"
     },
     {
       "id": "heimdall",
@@ -918,7 +1002,7 @@
       "bpm": 224,
       "beats": 4,
       "root": 64,
-      "character": "終末を告げる角笛の五度と虹橋の上昇",
+      "character": "ギャラルホルンの五度と付点三連の号令、虹橋の高音",
       "file": "heimdall.ogg",
       "bars": 28,
       "frames": 1323000,
@@ -931,17 +1015,20 @@
         "i",
         "i"
       ],
-      "sha256": "a832803da5c7542023d6af6ef54a91950c364bf6e9309eb207e6db9286df321d",
-      "midi_sha256": "8ee027fe30019517fb4c65f2143d88dddb9daf913c87f467d75ee74bfe73ac98",
+      "sha256": "ac17cce0b608ccba57d85af256015d7d81c4ebd9cb09d8f473def0c0828d03c3",
+      "midi_sha256": "1b19636a26903263889488fa0dd762068424b845e8e1a752d75993a8396e08fd",
       "target_lufs": -15,
-      "note_count": 2269,
+      "note_count": 1241,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "ABAXbYX",
+      "score_sha256": "b033ab8f2c9d06caf35978cbdfbd660078a8240c75366bd3c20d28021f27d772"
     },
     {
       "id": "loki",
@@ -950,7 +1037,7 @@
       "bpm": 228,
       "beats": 3,
       "root": 63,
-      "character": "三拍子の顔を変える二拍アクセント",
+      "character": "三拍子を二拍ずつ横切る仮面舞踏、旋律の反転と跳躍",
       "file": "loki.ogg",
       "bars": 40,
       "frames": 1392632,
@@ -963,17 +1050,20 @@
         "i",
         "i"
       ],
-      "sha256": "c02261821e80caac03b393fa68d18e934a441b06626184be892777afe3684771",
-      "midi_sha256": "9da3834ae0e172bed3a4b1e32756ba9f27c427b09354d89138ad12924b92f770",
+      "sha256": "b32512769f43165756b12c9737b50ccd5c1ea751b4b2c886c1e402318d02b875",
+      "midi_sha256": "1912f3b4ab6fcc8d3d7a7ea6bb81517ca63fff75a9a9a612a79b67b6100f5ed8",
       "target_lufs": -15,
-      "note_count": 2130,
+      "note_count": 1754,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "ABaBAbXYXY",
+      "score_sha256": "89bcfa043b8b3ae66bf83b81efb20f6093d9f394fed17e3a60d6c79bfb08980e"
     },
     {
       "id": "thor",
@@ -982,7 +1072,7 @@
       "bpm": 232,
       "beats": 4,
       "root": 50,
-      "character": "鎚の四分連打、二重キックと雷鳴の下降",
+      "character": "九打の三連雷鎚、太いオクターブと二重キックの重圧",
       "file": "thor.ogg",
       "bars": 28,
       "frames": 1277379,
@@ -995,17 +1085,20 @@
         "i",
         "i"
       ],
-      "sha256": "0f717ad694e64d4c6fb3894d0c3385c02a59609f4f70b8d9d307d21f798e223d",
-      "midi_sha256": "cadd9f99af4233a4d4dae255e81c1e55aeac837f40391390726efaf15a4616c8",
+      "sha256": "2c6f304aeb28722a585e1867ea4bd724228f0f517a4b4915032c223ef2ab1796",
+      "midi_sha256": "2977a3b95f21b582dc8537f2df307cdb5ec62d78c7a8c43bd6c3dba78f479e51",
       "target_lufs": -15,
-      "note_count": 2365,
+      "note_count": 2757,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "AABXYXY",
+      "score_sha256": "86908fee4a77bc8545e760645edac2aff694e4300da165af3374c2bc4255cb5e"
     },
     {
       "id": "odin",
@@ -1014,7 +1107,7 @@
       "bpm": 228,
       "beats": 4,
       "root": 57,
-      "character": "槍の鋭い主旋律と、二羽の鴉の応答",
+      "character": "槍の跳躍と長い叙事旋律、間奏で交わす二羽の鴉の応答",
       "file": "odin.ogg",
       "bars": 28,
       "frames": 1299789,
@@ -1027,17 +1120,20 @@
         "i",
         "i"
       ],
-      "sha256": "d9a1da097e40e18db1a6826892d75ca03f28e11450122a90fd69cc21bc1cba43",
-      "midi_sha256": "6d7e0c6497ebc399e417ed78ef4f30f045fe672197d560e260e940fc4b6590ae",
+      "sha256": "ef991eb0c7bc8776dbcc9d5271ce01ca21dfd728c09a53df376d9ee198d3c2e6",
+      "midi_sha256": "a88e55d42cad619ad7334805a1b97149eaf16730952faf4d62fbf1cb714742c1",
       "target_lufs": -15,
-      "note_count": 2325,
+      "note_count": 1254,
       "instruments": [
         "piano",
         "electric guitar L/R",
         "electric bass",
         "rock drums",
         "myth accent"
-      ]
+      ],
+      "composition_version": 2,
+      "form": "ABabXYX",
+      "score_sha256": "7c4b41ed6405d5582225f11aefad354d1829652b56df02107126edfa39c181a2"
     },
     {
       "id": "shop",

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Check shipped music, authored scores, MIDI provenance and (optionally) decoded PCM."""
-import argparse, hashlib, json, math, re, struct, subprocess
+import argparse, hashlib, json, math, re, struct, subprocess, sys
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
 DIR=ROOT/'app/src/main/assets/music'
+sys.path.insert(0,str(ROOT/'tools/music'))
+from audit_scores import audit as audit_scores
 
 def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -23,7 +25,8 @@ def ogg(path):
     return last,data[header+11],struct.unpack_from('<I',data,header+12)[0]
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--audio',action='store_true');args=parser.parse_args()
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--audio',action='store_true')
+    parser.add_argument('--output',type=Path,default=ROOT/'artifacts/music-1.0.14');args=parser.parse_args()
     manifest=json.loads((DIR/'manifest.json').read_text()); tracks=manifest['tracks']
     scores=json.loads((ROOT/'tools/music/scores.json').read_text())
     kotlin=(ROOT/'app/src/main/java/io/github/hatake716/bossrush/Content.kt').read_text()
@@ -33,11 +36,18 @@ def main():
     assert set(p.name for p in DIR.glob('*.ogg'))=={t['file'] for t in tracks}
     assert 'title' in manifest['silent_scenes'] and not (DIR/'title.ogg').exists()
     assert (ROOT/'docs/licenses/GeneralUser-GS.txt').is_file()
+    diversity=audit_scores(tracks)
+    catalog=(ROOT/'app/src/main/java/io/github/hatake716/bossrush/BattleScore.kt').read_text()
+    for t in scores[:32]:
+        assert f'BattleTheme("{t["id"]}","{t["character"]}"' in catalog,t['id']
+    args.output.mkdir(parents=True,exist_ok=True)
+    (args.output/'score-audit.json').write_text(json.dumps(diversity,ensure_ascii=False,indent=2)+'\n')
     audit=[]
     for i,(t,s) in enumerate(zip(tracks,scores)):
         path=DIR/t['file']; assert sha(path)==t['sha256'],t['id']
         assert sha(ROOT/'tools/music/midi'/f"{t['id']}.mid")==t['midi_sha256']
         assert t['id']==s['id'] and t['bpm']==s['bpm'] and t['beats']==s['beats']
+        assert t['character']==s['character']
         if i<32: assert (t['id'],t['title'],t['bpm'],t['root'])==(bosses[i][0],bosses[i][1],int(bosses[i][2]),int(bosses[i][3]))
         assert t['bars']%4==0 and 27<=t['seconds']<=33 and t['note_count']>200
         assert t['harmony']==['bVI','bVII','i','i']
@@ -66,7 +76,7 @@ def main():
             audit.append(dict(id=t['id'],seconds=frames/44100,frames=frames,rms=rms,peak=peak,min_10ms_rms=min_rms,lufs=float(stats['input_i']),true_peak_db=float(stats['input_tp'])))
             print(f"{t['id']}: {frames/44100:.3f}s, {stats['input_i']} LUFS, {stats['input_tp']} dBTP",flush=True)
     if args.audio:
-        out=ROOT/'artifacts/music-1.0.12/audio-audit.json';out.parent.mkdir(parents=True,exist_ok=True);out.write_text(json.dumps(audit,indent=2)+'\n')
-    print(f"PASS: {len(tracks)} distinct stereo loops, harmony/motif metadata, PCM lengths, hashes and MIDI provenance")
+        (args.output/'audio-audit.json').write_text(json.dumps(audit,indent=2)+'\n')
+    print(f"PASS: {len(tracks)} stereo loops; 32 distinct hook rhythms/contours; literal MIDI, metadata, PCM lengths and provenance")
 
 if __name__=='__main__':main()

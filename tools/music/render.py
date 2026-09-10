@@ -8,6 +8,8 @@ from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 from pathlib import Path
 import numpy as np
+from battle_arranger import compose_battle
+from battle_scores import SCORES
 
 ROOT = Path(__file__).resolve().parents[2]
 RATE = 44100
@@ -21,6 +23,8 @@ def degree(n):
 
 
 def compose(t):
+    if t['id'] in SCORES:
+        return compose_battle(t)
     bars = int(math.floor(30 * t['bpm'] / (60 * t['beats'] * 4) + .5)) * 4
     beats, voice, root = t['beats'], t['voice'], t['root']
     gentle = voice in ('shop', 'ending')
@@ -264,6 +268,10 @@ def render(t,args):
     result.update(file=f"{t['id']}.ogg",bars=bars,frames=len(samples),seconds=round(len(samples)/RATE,6),sample_rate=RATE,channels=2,
                   harmony=['bVI','bVII','i','i'],sha256=hashlib.sha256(ogg.read_bytes()).hexdigest(),midi_sha256=hashlib.sha256(mid.read_bytes()).hexdigest(),target_lufs=target,
                   note_count=sum(e[1] for e in events),instruments=['piano','electric guitar L/R','electric bass','rock drums','myth accent'])
+    if t['id'] in SCORES:
+        score=SCORES[t['id']]
+        result.update(composition_version=2,form=score['form'],
+                      score_sha256=hashlib.sha256(json.dumps(score,sort_keys=True,ensure_ascii=False).encode()).hexdigest())
     (work/f"{t['id']}.json").write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
     print(f"{t['id']}: {bars} bars, {len(samples)/RATE:.3f}s, {ogg.stat().st_size//1024} KiB",flush=True)
     return result
@@ -272,20 +280,31 @@ def render(t,args):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--soundfont',required=True); parser.add_argument('--library',default='libfluidsynth.so.3')
-    parser.add_argument('--output',default=str(ROOT/'artifacts/music-1.0.12'))
-    parser.add_argument('--only',nargs='*'); parser.add_argument('--jobs',type=int,default=1); args=parser.parse_args()
+    parser.add_argument('--output',default=str(ROOT/'artifacts/music-1.0.14'))
+    selection=parser.add_mutually_exclusive_group()
+    selection.add_argument('--only',nargs='+'); selection.add_argument('--battle',action='store_true')
+    parser.add_argument('--jobs',type=int,default=1); args=parser.parse_args()
     assert hashlib.sha256(Path(args.soundfont).read_bytes()).hexdigest()==SF_SHA,'Unexpected instrument bank'
     scores=json.loads((ROOT/'tools/music/scores.json').read_text())
-    selected=[t for t in scores if not args.only or t['id'] in args.only]
+    selected=[t for t in scores if (not args.only or t['id'] in args.only) and (not args.battle or t['id'] in SCORES)]
+    assert selected and (not args.only or set(args.only)<=set(t['id'] for t in scores)), 'Unknown track ID'
+    manifest_path=ROOT/'app/src/main/assets/music/manifest.json'
+    previous=json.loads(manifest_path.read_text())['tracks'] if manifest_path.exists() else []
+    entries={t['id']:t for t in previous}
     if args.jobs > 1:
         with ProcessPoolExecutor(max_workers=args.jobs) as pool:
-            list(pool.map(partial(render,args=args),selected))
+            rendered=list(pool.map(partial(render,args=args),selected))
     else:
-        for t in selected: render(t,args)
-    if all((Path(args.output)/f"{t['id']}.json").exists() for t in scores):
-        manifest={'version':1,'sample_rate':RATE,'channels':2,'silent_scenes':['title','jobs','codex','help','gameover'],
+        rendered=[render(t,args) for t in selected]
+    entries.update({t['id']:t for t in rendered})
+    if all(t['id'] in entries for t in scores):
+        # Partial renders retain only manifest entries that still match shipped files.
+        for t in entries.values():
+            assert hashlib.sha256((manifest_path.parent/t['file']).read_bytes()).hexdigest()==t['sha256'],t['id']
+            assert hashlib.sha256((ROOT/'tools/music/midi'/f"{t['id']}.mid").read_bytes()).hexdigest()==t['midi_sha256'],t['id']
+        manifest={'version':2,'sample_rate':RATE,'channels':2,'silent_scenes':['title','jobs','codex','help','gameover'],
                   'soundfont':{'name':'GeneralUser GS 2.0.3','sha256':SF_SHA,'source_commit':'684543d5e5efaef08d02be50dcda8d552478fa60'},
-                  'tracks':[json.loads((Path(args.output)/f"{t['id']}.json").read_text()) for t in scores]}
-        (ROOT/'app/src/main/assets/music/manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n')
+                  'tracks':[entries[t['id']] for t in scores]}
+        manifest_path.write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n')
 
 if __name__=='__main__': main()

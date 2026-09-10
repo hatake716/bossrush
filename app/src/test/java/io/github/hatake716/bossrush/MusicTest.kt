@@ -23,7 +23,7 @@ class MusicTest {
             assertEquals(7, chord[2] - chord[0])
             assertEquals(listOf(8, 10, 0, 0)[bar % 4], chord[0])
         }
-        assertEquals(32, BattleScore.themes.map { it.phraseA to it.phraseB }.toSet().size)
+        assertEquals(32, BattleScore.themes.map { it.id to it.character }.toSet().size)
         assertEquals(3, MusicCatalog.battles.first { it.id == "loki" }.beats)
         assertTrue(MusicCatalog.battles.all { it.bpm in 192..232 })
     }
