@@ -86,6 +86,7 @@ class MainStoryUiTest {
         tap("この場面をスキップ")
         assertEquals(StoryMoment.EPILOGUE,read { it.run!!.storyMoment })
         tap("次へ →"); reopen(); assertEquals(1,read { it.run!!.storyPage })
+        assertTrue(rule.activity.gameView.scoreRecords.isEmpty())
         screenshot("epilogue-device")
         val bitmap=ins.uiAutomation.takeScreenshot(); var blue=0
         for(x in 0 until bitmap.width step 8) for(y in 0 until bitmap.height step 8) {
@@ -96,6 +97,9 @@ class MainStoryUiTest {
         tap("この場面をスキップ"); assertEquals(Screen.ENDING,read { it.screen })
         val prefs=ins.targetContext.getSharedPreferences("bossrush",0)
         assertEquals(1,prefs.getInt("clears",0)); assertFalse(prefs.contains("run"))
+        val history=ScoreHistoryCodec.decode(prefs.getString("scores",null))
+        assertEquals(1,history.size); assertEquals(ScoreOutcome.CLEAR,history.single().outcome)
+        assertEquals(read { it.run!!.score },history.single().score)
         tap("タイトルへ"); assertEquals(1,prefs.getInt("clears",0)); assertFalse(rule.activity.gameView.hasSave)
     }
     @Test fun saveCodecMigratesLegacyAdventureAndRejectsInvalidStoryPage() {

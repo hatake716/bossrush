@@ -3,7 +3,7 @@ package io.github.hatake716.bossrush
 import kotlin.math.*
 import kotlin.random.Random
 
-enum class Screen { TITLE, JOBS, STORY, INTRO, BATTLE, CUTIN, DEFEAT, REWARD, SHOP, PAUSED, GAMEOVER, ENDING, CODEX, HELP }
+enum class Screen { TITLE, JOBS, STORY, INTRO, BATTLE, CUTIN, DEFEAT, REWARD, SHOP, PAUSED, GAMEOVER, ENDING, CODEX, HELP, SCORES }
 data class Run(
     val job: Job, var stage: Int = 0, val levels: IntArray = intArrayOf(1,1,1,1),
     var gold: Int = 0, val inventory: MutableList<Item> = mutableListOf(Item.POTION, Item.POTION),

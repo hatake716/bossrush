@@ -8,6 +8,9 @@ import android.view.*
 import android.view.accessibility.*
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlin.math.*
 
 data class UiButton(val label: String,val rect: RectF,val enabled: Boolean=true,val skill: Int=-1,val upgradeSlot: Int=-1,val action: () -> Unit)
@@ -16,6 +19,13 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     val audio=Chiptune(context)
     var hasSave=false
     var bestScore=0
+    private val scoreDateFormat=DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm",java.util.Locale.ROOT)
+    private var scoreDates=emptyList<String>()
+    var scoreRecords: List<ScoreRecord> = emptyList()
+        set(value) {
+            field=HighScores.ranked(value)
+            scoreDates=field.map { r -> r.finishedAt?.let { scoreDateFormat.format(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())) } ?: "日時不明" }
+        }
     var onContinue: (() -> Unit)?=null
     var onSoundChanged: ((Boolean) -> Unit)?=null
     private val art=PixelArt(context.assets)
@@ -127,6 +137,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         Screen.BATTLE -> "戦闘 ${engine.bossInfo.name}"; Screen.CUTIN -> "必殺技 ${engine.bossInfo.ultimate}"
         Screen.DEFEAT -> "ボス撃破 爆散"; Screen.REWARD -> "ボス撃破 技の成長"; Screen.SHOP -> "ショップ"; Screen.PAUSED -> "一時停止"
         Screen.GAMEOVER -> "ゲームオーバー"; Screen.ENDING -> "ゲームクリア"; Screen.CODEX -> "神話図鑑"; Screen.HELP -> "遊び方"
+        Screen.SCORES -> "ハイスコア 上位10件"
     }
     private fun resetInput() {
         joystickId=-1; skillPointer=-1; touchSkill=-1; pressed=null; stickX=0f; stickY=0f
@@ -144,7 +155,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             Screen.BATTLE,Screen.CUTIN -> engine.pause()
             Screen.PAUSED -> engine.unpause()
             Screen.CODEX,Screen.HELP -> engine.changeScreen(returnScreen)
-            Screen.JOBS,Screen.STORY,Screen.INTRO,Screen.SHOP,Screen.GAMEOVER,Screen.ENDING -> engine.changeScreen(Screen.TITLE)
+            Screen.JOBS,Screen.STORY,Screen.INTRO,Screen.SHOP,Screen.GAMEOVER,Screen.ENDING,Screen.SCORES -> engine.changeScreen(Screen.TITLE)
             Screen.REWARD -> engine.cancelUpgrade()
             Screen.DEFEAT -> Unit
             else -> (context as? android.app.Activity)?.moveTaskToBack(true)
@@ -219,6 +230,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             Screen.SHOP -> shop(canvas)
             Screen.CODEX -> codex(canvas)
             Screen.HELP -> help(canvas)
+            Screen.SCORES -> highScores(canvas)
             Screen.GAMEOVER -> result(canvas,false)
             Screen.ENDING -> result(canvas,true)
         }
@@ -260,16 +272,55 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         text(c,"神々を越えて、色を取り戻せ。",48f,313f,20f)
         text(c,"4つの職業。32の試練。ひとつの夜明け。",49f,344f,14f,Ink.mid)
         button(c,"はじめから  →",48f,372f,212f,49f,true) {
-            if(hasSave) controller.prepareDialog(AlertDialog.Builder(context).setTitle("新しい冒険を始めますか？").setMessage("職業を選んで出発すると、今の冒険の保存データが置き換わります。最高スコアは残ります。")
+            if(hasSave) controller.prepareDialog(AlertDialog.Builder(context).setTitle("新しい冒険を始めますか？").setMessage("職業を選んで出発すると、今の冒険の保存データが置き換わります。ハイスコアの記録は残ります。")
                 .setPositiveButton("職業を選ぶ") { _,_ -> engine.changeScreen(Screen.JOBS) }.setNegativeButton("戻る",null).show())
             else engine.changeScreen(Screen.JOBS)
         }
         button(c,"つづきから",274f,372f,173f,49f,enabled=hasSave) { onContinue?.invoke() }
         button(c,"遊び方",48f,438f,123f,36f) { returnScreen=Screen.TITLE; engine.changeScreen(Screen.HELP) }
         button(c,"神話図鑑",185f,438f,123f,36f) { returnScreen=Screen.TITLE; engine.changeScreen(Screen.CODEX) }
+        button(c,"ハイスコア",322f,438f,125f,36f) { engine.changeScreen(Screen.SCORES) }
         pixel(c,"BEST ${bestScore.toString().padStart(6,'0')}",48f,502f,1.65f,Ink.mid)
         rect(c,638f+extra,fullBottom-45f,288f,29f,Color.argb(215,16,29,26))
         pixel(c,"32 GODS / 4 HEROES / 1 DAWN",649f+extra,fullBottom-35f,1.2f,Ink.mid)
+    }
+    private fun highScores(c: Canvas) {
+        header(c,"HALL OF HEROES",false)
+        pixel(c,"TOP 10",37f,80f,3.5f)
+        text(c,"旅人たちの記録",230f,104f,22f)
+        text(c,"高いスコア順。同点は新しい記録から。",38f,135f,13f,Ink.mid)
+        rect(c,36f,153f,888f+extra,308f,Ink.dark); border(c,36f,153f,888f+extra,308f)
+        if(scoreRecords.isEmpty()) {
+            pixel(c,"NO RECORDS YET",480f+extra/2,245f,2.8f,Ink.mid,true)
+            text(c,"記録はまだありません",480f+extra/2,309f,23f,Ink.light,Paint.Align.CENTER)
+            text(c,"冒険を終えると、ここに記録が残ります。",480f+extra/2,349f,16f,Ink.mid,Paint.Align.CENTER)
+            contentDescription="BOSSRUSH ハイスコア。記録はまだありません。"
+        } else {
+            val scoreX=297f+extra*.22f; val jobX=345f+extra*.35f
+            val killsX=488f+extra*.52f; val resultX=601f+extra*.67f; val dateX=907f+extra
+            text(c,"順位",52f,174f,12f,Ink.mid)
+            text(c,"スコア",scoreX,174f,12f,Ink.mid,Paint.Align.RIGHT)
+            text(c,"職業",jobX,174f,12f,Ink.mid); text(c,"討伐数",killsX,174f,12f,Ink.mid)
+            text(c,"結果",resultX,174f,12f,Ink.mid); text(c,"記録日時",dateX,174f,12f,Ink.mid,Paint.Align.RIGHT)
+            for(i in 0 until HighScores.LIMIT) {
+                val y=183f+i*27
+                if(i%2==0) rect(c,38f,y,884f+extra,27f,Ink.deep)
+                val r=scoreRecords.getOrNull(i)
+                if(i==0) rect(c,38f,y,3f,27f,Ink.light)
+                pixel(c,(i+1).toString().padStart(2,'0'),54f,y+8,1.4f,if(i<3) Ink.light else Ink.mid)
+                if(r==null) { text(c,"--",scoreX,y+19,15f,Ink.mid,Paint.Align.RIGHT); continue }
+                text(c,r.score.toString(),scoreX,y+20,19f,Ink.light,Paint.Align.RIGHT)
+                text(c,r.job?.label ?: "不明",jobX,y+19,14f)
+                text(c,r.kills?.let { "$it / 32" } ?: "不明",killsX,y+19,14f)
+                text(c,r.outcome.label,resultX,y+19,12f,if(r.outcome==ScoreOutcome.CLEAR) Ink.light else Ink.mid)
+                text(c,scoreDates[i],dateX,y+19,12f,Ink.mid,Paint.Align.RIGHT)
+            }
+            contentDescription="BOSSRUSH ハイスコア。"+scoreRecords.mapIndexed { i,r ->
+                "${i+1}位、${r.score}点、${r.job?.label ?: "職業不明"}、${r.kills?.let { "$it 体撃破" } ?: "討伐数不明"}、${r.outcome.label}、${scoreDates[i]}。"
+            }.joinToString("")
+        }
+        button(c,"タイトルへ",36f,478f,215f,44f,true) { engine.changeScreen(Screen.TITLE) }
+        text(c,"終了した冒険を自動保存 ・ 上位10件",921f+extra,505f,13f,Ink.mid,Paint.Align.RIGHT)
     }
     private fun jobs(c: Canvas) {
         header(c,"CHOOSE YOUR HERO")

@@ -28,14 +28,15 @@ class MainActivity: ComponentActivity() {
         }
         val engine=GameEngine()
         gameView=GameView(this,engine)
+        val history=ScoreHistory(prefs)
+        gameView.scoreRecords=history.load()
         engine.onCheckpoint={ saveRun(engine.run) }
-        engine.onResult={ score,clear ->
-            prefs.edit().remove("run").putInt("best",maxOf(score,prefs.getInt("best",0)))
-                .putInt("clears",prefs.getInt("clears",0)+if(clear) 1 else 0).apply()
-            gameView.hasSave=false; gameView.bestScore=prefs.getInt("best",0)
+        engine.onResult={ _,clear ->
+            gameView.scoreRecords=history.finish(checkNotNull(engine.run),clear)
+            gameView.hasSave=false; gameView.bestScore=gameView.scoreRecords.firstOrNull()?.score ?: 0
         }
         gameView.hasSave=loadRun()!=null
-        gameView.bestScore=prefs.getInt("best",0)
+        gameView.bestScore=gameView.scoreRecords.firstOrNull()?.score ?: 0
         gameView.audio.enabled=prefs.getBoolean("sound",true)
         gameView.onSoundChanged={ prefs.edit().putBoolean("sound",it).apply() }
         gameView.onContinue={ loadRun()?.let { engine.run=it; engine.selectedJob=it.job; engine.resumeRun() } }
