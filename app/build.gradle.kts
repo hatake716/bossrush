@@ -1,7 +1,19 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+// Release signing is opt-in and stays out of the repository: create
+// keystore.properties (gitignored) with storeFile/storePassword/keyAlias/keyPassword.
+// Without it, release builds are produced unsigned exactly as before.
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+val hasSigningConfig = keystoreProperties.getProperty("storeFile") != null
+
 android {
     namespace = "io.github.hatake716.bossrush"
     compileSdk = 36
@@ -14,11 +26,20 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     androidResources { noCompress += "ogg" }
+    signingConfigs {
+        if (hasSigningConfig) create("release") {
+            storeFile = file(keystoreProperties.getProperty("storeFile"))
+            storePassword = keystoreProperties.getProperty("storePassword")
+            keyAlias = keystoreProperties.getProperty("keyAlias")
+            keyPassword = keystoreProperties.getProperty("keyPassword")
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (hasSigningConfig) signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

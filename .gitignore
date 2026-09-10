@@ -9,3 +9,5 @@ artifacts/
 .idea/
 *.iml
 __pycache__/
+play/release/
+play/video/
