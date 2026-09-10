@@ -37,10 +37,11 @@ class FullscreenTest {
             for((width,height,left,right) in configurations) {
                 val e=GameEngine(); e.newRun(); e.run!!.stage=30; e.beginBattle()
                 val view=GameView(context,e); view.layout(0,0,width,height); view.safeArea(left,0,right,0)
+                view.normalCleared=true
                 view.scoreRecords=(0..9).map { i ->
                     if(i==9) ScoreRecord(10,ScoreOutcome.LEGACY)
                     else ScoreRecord(800000-i*10000,if(i==0) ScoreOutcome.CLEAR else ScoreOutcome.GAMEOVER,
-                        Job.entries[i%4],if(i==0) 32 else 31-i,1789000000000L+i)
+                        Job.entries[i%4],if(i==0) 32 else 31-i,1789000000000L+i,if(i%2==0) GameMode.HARD else GameMode.NORMAL)
                 }
                 val bitmap=Bitmap.createBitmap(width,height,Bitmap.Config.ARGB_8888)
                 for(screen in Screen.entries) {

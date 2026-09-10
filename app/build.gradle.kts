@@ -9,8 +9,8 @@ android {
         applicationId = "io.github.hatake716.bossrush"
         minSdk = 26
         targetSdk = 36
-        versionCode = 20
-        versionName = "1.0.19"
+        versionCode = 21
+        versionName = "1.0.20"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     androidResources { noCompress += "ogg" }

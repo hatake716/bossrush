@@ -30,9 +30,11 @@ class MainActivity: ComponentActivity() {
         gameView=GameView(this,engine)
         val history=ScoreHistory(prefs)
         gameView.scoreRecords=history.load()
+        gameView.normalCleared=history.normalCleared
         engine.onCheckpoint={ saveRun(engine.run) }
         engine.onResult={ _,clear ->
             gameView.scoreRecords=history.finish(checkNotNull(engine.run),clear)
+            gameView.normalCleared=history.normalCleared
             gameView.hasSave=false; gameView.bestScore=gameView.scoreRecords.firstOrNull()?.score ?: 0
         }
         gameView.hasSave=loadRun()!=null

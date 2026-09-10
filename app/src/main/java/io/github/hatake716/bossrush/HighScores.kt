@@ -7,7 +7,8 @@ data class ScoreRecord(
     val outcome: ScoreOutcome,
     val job: Job?=null,
     val kills: Int?=null,
-    val finishedAt: Long?=null
+    val finishedAt: Long?=null,
+    val mode: GameMode=GameMode.NORMAL
 ) {
     val valid get()=score>=0 && when(outcome) {
         ScoreOutcome.LEGACY -> job==null && kills==null && finishedAt==null

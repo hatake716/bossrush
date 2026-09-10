@@ -5,7 +5,7 @@ import org.json.JSONObject
 
 /** Version 1 adventures migrate at their current boss, without replaying earned rewards. */
 object RunCodec {
-    fun encode(run: Run): String = JSONObject().put("version",2).put("job",run.job.name).put("stage",run.stage)
+    fun encode(run: Run): String = JSONObject().put("version",3).put("mode",run.mode.name).put("job",run.job.name).put("stage",run.stage)
         .put("levels",JSONArray(run.levels.toList())).put("inventory",JSONArray(run.inventory.map { it.name }))
         .put("gold",run.gold).put("score",run.score).put("time",run.totalTime).put("damage",run.totalDamage)
         .put("kills",run.kills).put("previousHp",run.previousHp).put("checkpoint",run.checkpoint)
@@ -15,7 +15,7 @@ object RunCodec {
     fun decode(str: String?): Run? = try {
         if(str==null) null else {
             val j=JSONObject(str); val version=j.getInt("version")
-            require(version in 1..2)
+            require(version in 1..3)
             val levels=j.getJSONArray("levels"); val inventory=j.getJSONArray("inventory")
             require(levels.length()==4 && inventory.length()<=5)
             val r=Run(Job.valueOf(j.getString("job")),j.getInt("stage"),
@@ -26,7 +26,8 @@ object RunCodec {
                 storyEnabled=if(version==1) true else j.getBoolean("story"),
                 storyMoment=if(version==1) StoryMoment.PROLOGUE else StoryMoment.valueOf(j.getString("storyMoment")),
                 storyPage=if(version==1) 0 else j.getInt("storyPage"),
-                storyBeforeStage=if(version==1) -1 else j.getInt("storyBeforeStage"))
+                storyBeforeStage=if(version==1) -1 else j.getInt("storyBeforeStage"),
+                mode=if(version<3) GameMode.NORMAL else GameMode.valueOf(j.getString("mode")))
             require(r.stage in 0..31 && r.gold>=0 && r.kills in 0..32 && r.score>=0)
             require(r.checkpoint in (if(version==1) listOf("INTRO","SHOP") else listOf("INTRO","SHOP","STORY")))
             require(r.totalTime.isFinite() && r.totalDamage.isFinite() && r.previousHp.isFinite())

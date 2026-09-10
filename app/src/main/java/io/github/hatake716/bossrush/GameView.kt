@@ -19,6 +19,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     val audio=Chiptune(context)
     var hasSave=false
     var bestScore=0
+    var normalCleared=false
     private val scoreDateFormat=DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm",java.util.Locale.ROOT)
     private var scoreDates=emptyList<String>()
     var scoreRecords: List<ScoreRecord> = emptyList()
@@ -265,24 +266,33 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         }
     }
     private fun title(c: Canvas) {
-        landscape(c); header(c,"THE COLORLESS SAGA",false)
+        landscape(c,normalCleared); header(c,if(normalCleared) "THE WORLD IN COLOR" else "THE COLORLESS SAGA",false)
         pixel(c,"A POCKET-SIZED RAID ADVENTURE",48f,101f,1.35f,Ink.mid)
         pixel(c,"BOSS",47f,141f,9f,Ink.mid); pixel(c,"BOSS",44f,137f,9f)
         pixel(c,"RUSH",47f,220f,9f,Ink.mid); pixel(c,"RUSH",44f,216f,9f)
-        text(c,"神々を越えて、色を取り戻せ。",48f,313f,20f)
+        text(c,if(normalCleared) "色を取り戻した世界に、新たな試練。" else "神々を越えて、色を取り戻せ。",48f,313f,20f)
         text(c,"4つの職業。32の試練。ひとつの夜明け。",49f,344f,14f,Ink.mid)
-        button(c,"はじめから  →",48f,372f,212f,49f,true) {
-            if(hasSave) controller.prepareDialog(AlertDialog.Builder(context).setTitle("新しい冒険を始めますか？").setMessage("職業を選んで出発すると、今の冒険の保存データが置き換わります。ハイスコアの記録は残ります。")
-                .setPositiveButton("職業を選ぶ") { _,_ -> engine.changeScreen(Screen.JOBS) }.setNegativeButton("戻る",null).show())
-            else engine.changeScreen(Screen.JOBS)
-        }
+        button(c,"はじめから  →",48f,372f,212f,49f,true) { chooseMode(GameMode.NORMAL) }
         button(c,"つづきから",274f,372f,173f,49f,enabled=hasSave) { onContinue?.invoke() }
+        if(normalCleared) {
+            button(c,"ハードモード  →",461f,372f,212f,49f) { chooseMode(GameMode.HARD) }
+            rect(c,461f,435f,275f,43f,Ink.dark)
+            text(c,"解放済み：敵の攻撃力・スコア3倍",473f,461f,13f,Ink.light)
+        }
         button(c,"遊び方",48f,438f,123f,36f) { returnScreen=Screen.TITLE; engine.changeScreen(Screen.HELP) }
         button(c,"神話図鑑",185f,438f,123f,36f) { returnScreen=Screen.TITLE; engine.changeScreen(Screen.CODEX) }
         button(c,"ハイスコア",322f,438f,125f,36f) { engine.changeScreen(Screen.SCORES) }
         pixel(c,"BEST ${bestScore.toString().padStart(6,'0')}",48f,502f,1.65f,Ink.mid)
         rect(c,638f+extra,fullBottom-45f,288f,29f,Color.argb(215,16,29,26))
         pixel(c,"32 GODS / 4 HEROES / 1 DAWN",649f+extra,fullBottom-35f,1.2f,Ink.mid)
+    }
+    private fun chooseMode(mode: GameMode) {
+        if(mode==GameMode.HARD && !normalCleared) return
+        val proceed={ engine.selectedMode=mode; engine.changeScreen(Screen.JOBS) }
+        if(hasSave) controller.prepareDialog(AlertDialog.Builder(context).setTitle("新しい冒険を始めますか？")
+            .setMessage("${mode.label}モードで出発します。職業を選んで出発すると、今の冒険の保存データが置き換わります。ハイスコアの記録は残ります。")
+            .setPositiveButton("職業を選ぶ") { _,_ -> proceed() }.setNegativeButton("戻る",null).show())
+        else proceed()
     }
     private fun highScores(c: Canvas) {
         header(c,"HALL OF HEROES",false)
@@ -296,11 +306,12 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             text(c,"冒険を終えると、ここに記録が残ります。",480f+extra/2,349f,16f,Ink.mid,Paint.Align.CENTER)
             contentDescription="BOSSRUSH ハイスコア。記録はまだありません。"
         } else {
-            val scoreX=297f+extra*.22f; val jobX=345f+extra*.35f
+            val scoreX=275f+extra*.22f; val jobX=310f+extra*.30f; val modeX=415f+extra*.42f
             val killsX=488f+extra*.52f; val resultX=601f+extra*.67f; val dateX=907f+extra
             text(c,"順位",52f,174f,12f,Ink.mid)
             text(c,"スコア",scoreX,174f,12f,Ink.mid,Paint.Align.RIGHT)
             text(c,"職業",jobX,174f,12f,Ink.mid); text(c,"討伐数",killsX,174f,12f,Ink.mid)
+            text(c,"モード",modeX,174f,12f,Ink.mid)
             text(c,"結果",resultX,174f,12f,Ink.mid); text(c,"記録日時",dateX,174f,12f,Ink.mid,Paint.Align.RIGHT)
             for(i in 0 until HighScores.LIMIT) {
                 val y=183f+i*27
@@ -311,21 +322,22 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
                 if(r==null) { text(c,"--",scoreX,y+19,15f,Ink.mid,Paint.Align.RIGHT); continue }
                 text(c,r.score.toString(),scoreX,y+20,19f,Ink.light,Paint.Align.RIGHT)
                 text(c,r.job?.label ?: "不明",jobX,y+19,14f)
+                text(c,r.mode.label,modeX,y+19,12f,if(r.mode==GameMode.HARD) Ink.light else Ink.mid)
                 text(c,r.kills?.let { "$it / 32" } ?: "不明",killsX,y+19,14f)
                 text(c,r.outcome.label,resultX,y+19,12f,if(r.outcome==ScoreOutcome.CLEAR) Ink.light else Ink.mid)
                 text(c,scoreDates[i],dateX,y+19,12f,Ink.mid,Paint.Align.RIGHT)
             }
             contentDescription="BOSSRUSH ハイスコア。"+scoreRecords.mapIndexed { i,r ->
-                "${i+1}位、${r.score}点、${r.job?.label ?: "職業不明"}、${r.kills?.let { "$it 体撃破" } ?: "討伐数不明"}、${r.outcome.label}、${scoreDates[i]}。"
+                "${i+1}位、${r.score}点、${r.mode.label}モード、${r.job?.label ?: "職業不明"}、${r.kills?.let { "$it 体撃破" } ?: "討伐数不明"}、${r.outcome.label}、${scoreDates[i]}。"
             }.joinToString("")
         }
         button(c,"タイトルへ",36f,478f,215f,44f,true) { engine.changeScreen(Screen.TITLE) }
         text(c,"終了した冒険を自動保存 ・ 上位10件",921f+extra,505f,13f,Ink.mid,Paint.Align.RIGHT)
     }
     private fun jobs(c: Canvas) {
-        header(c,"CHOOSE YOUR HERO")
+        header(c,"CHOOSE YOUR HERO / ${engine.selectedMode.name}")
         pixel(c,"WHO WILL FACE THE GODS?",36f,83f,2.4f)
-        text(c,"色を失った世界に、小さな勇者が立ち上がる。",36f,126f,15f,Ink.mid)
+        text(c,if(engine.selectedMode==GameMode.HARD) "ハードモード：敵の攻撃力3倍。獲得スコア3倍。" else "通常モード：色を失った世界に、小さな勇者が立ち上がる。",36f,126f,15f,Ink.mid)
         Job.entries.forEachIndexed { i,job ->
             val x=36f+i*(226+extra/3); val selected=engine.selectedJob==job
             rect(c,x,149f,211f,243f,if(selected) Ink.deep else Ink.dark); border(c,x,149f,211f,243f,if(selected) Ink.light else Ink.mid)
@@ -383,7 +395,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     }
     private fun intro(c: Canvas) {
         val b=engine.bossInfo; val stage=engine.run!!.stage
-        header(c,"THE NEXT ENCOUNTER")
+        header(c,"THE NEXT ENCOUNTER / ${engine.mode.name}")
         rect(c,36f,79f,355f+extra,416f,Ink.deep); border(c,36f,79f,355f+extra,416f)
         pixel(c,"ENCOUNTER ${(stage+1).toString().padStart(2,'0')} / 32",60f,103f,1.8f)
         backgrounds.portrait(c,b.id,38f,142f,351f+extra,276f)
@@ -410,7 +422,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     }
     private fun battle(c: Canvas) {
         val e=engine; val r=e.run!!; val b=e.bossInfo
-        header(c,"${(r.stage+1).toString().padStart(2,'0')} / 32   ${b.id.uppercase()}",false)
+        header(c,"${r.mode.name}  ${(r.stage+1).toString().padStart(2,'0')} / 32   ${b.id.uppercase()}",false)
         shifted(c,0f,headerTop) { button(c,"II",880f+extra,12f,57f,31f) { e.pause() } }
         text(c,b.name,28f,80f,19f)
         bar(c,225f,65f,307f+extra,16f,e.boss.hp,e.boss.maxHp)
@@ -725,7 +737,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             "03  技と召喚" to "技にはゲージと待機時間が必要。召喚士は回復速度が半分で仲間は2体まで。はにわは成長で耐久1〜4回・5〜20秒。再タップで近接攻撃。白ウサギの回復は8〜16。",
             "04  必殺技とアイテム" to "4番目の技はHP1/3以下で各ボス戦1回だけ使える必殺技。ゲージ消費なし。回復には薬草や白ウサギを使います。下のアイテムを選ぶと時間が止まり、効果を確認できます。かばんは5個まで。",
             "05  成長と物語" to "撃破後に技を選び、次へ進むと確定。Lv.16が最大。盗賊は特殊品も選択。物語は前後のページへ移動・スキップが可能。ページごと、戦闘前、買い物後に自動保存。",
-            "06  高いスコアへ" to "素早く倒し、被ダメージを減らすと高得点。全32体を越えると世界に色が戻ります。物理キー：WASD/矢印で移動、1〜4で技、Escで一時停止。"
+            "06  高いスコアへ" to "素早く倒し、被ダメージを減らすと高得点。通常モードで全32体をクリアするとタイトルがカラーに。敵の攻撃力と獲得スコアが3倍のハードモードも解放されます。"
         )
         topics.forEachIndexed { i,pair ->
             val x=36f+(i%2)*(455+extra); val y=145f+(i/2)*123
@@ -737,7 +749,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         val r=engine.run!!
         if(clear) landscape(c,true) else landscape(c)
         if(!clear) fullRect(c,Color.argb(200,16,29,26))
-        header(c,if(clear) "A NEW DAWN" else "THE JOURNEY ENDS",false)
+        header(c,"${if(clear) "A NEW DAWN" else "THE JOURNEY ENDS"} / ${r.mode.name}",false)
         pixel(c,if(clear) "THE WORLD" else "GAME OVER",40f,103f,4.5f,if(clear) Ink.dawn[3] else Ink.light)
         if(clear) pixel(c,"IN COLOR",40f,155f,4.5f,Ink.dawn[2])
         text(c,if(clear) "世界に、色が戻った。" else "夜は、まだ明けない。",40f,if(clear) 233f else 188f,26f,if(clear) Ink.dawn[3] else Ink.light)
@@ -746,12 +758,13 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         pixel(c,"SCORE ${r.score.toString().padStart(6,'0')}",58f,383f,2.4f,if(clear) Ink.dawn[3] else Ink.light)
         text(c,"${r.job.label}  /  ${r.kills}体撃破  /  %.1f秒  /  被ダメージ %.0f".format(java.util.Locale.ROOT,r.totalTime,r.totalDamage),58f,438f,13f,if(clear) Ink.dawn[2] else Ink.mid)
         button(c,"タイトルへ",40f,478f,215f,44f,true) { engine.changeScreen(Screen.TITLE) }
+        if(clear && r.mode==GameMode.NORMAL) text(c,"ハードモード解放！ タイトルから挑戦",40f,350f,14f,Ink.dawn[3])
         if(clear) shifted(c,extra) {
             rect(c,566f,fullBottom-66f,358f,49f,Color.argb(215,16,29,26))
             text(c,"THANK YOU FOR PLAYING",736f,fullBottom-48f,15f,Ink.dawn[3],Paint.Align.CENTER)
             text(c,"BOSSRUSH / ORIGINAL ART & MUSIC",736f,fullBottom-26f,11f,Ink.dawn[2],Paint.Align.CENTER)
         }
-        else button(c,"もう一度挑む",274f,478f,227f,44f) { engine.changeScreen(Screen.JOBS) }
+        else button(c,"もう一度挑む",274f,478f,227f,44f) { engine.selectedMode=r.mode; engine.changeScreen(Screen.JOBS) }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {

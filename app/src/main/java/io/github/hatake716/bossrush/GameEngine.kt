@@ -10,9 +10,10 @@ data class Run(
     var score: Int = 0, var totalTime: Double = 0.0, var totalDamage: Double = 0.0,
     var kills: Int = 0, var previousHp: Double = 0.0, var checkpoint: String = "INTRO",
     var storyEnabled: Boolean = false, var storyMoment: StoryMoment = StoryMoment.PROLOGUE,
-    var storyPage: Int = 0, var storyBeforeStage: Int = -1
+    var storyPage: Int = 0, var storyBeforeStage: Int = -1,
+    val mode: GameMode = GameMode.NORMAL
 ) {
-    fun copyForTrial() = Run(job, stage, levels.copyOf(), inventory = mutableListOf())
+    fun copyForTrial() = Run(job, stage, levels.copyOf(), inventory = mutableListOf(),mode=mode)
 }
 data class Actor(var x: Double, var y: Double, var hp: Double, var maxHp: Double, var facing: Double = -PI/2)
 data class Summon(val kind: Int, var x: Double, var y: Double, var life: Double, var timer: Double = .1, val level: Int=1, val finisher: Boolean=false, val formation: Int=0,
@@ -60,6 +61,8 @@ class GameEngine(random: Random=Random.Default) {
     val job get() = run?.job ?: Job.WARRIOR
     val levels get() = run?.levels ?: intArrayOf(1,1,1,1)
     var selectedJob = Job.WARRIOR
+    var selectedMode = GameMode.NORMAL
+    val mode get() = run?.mode ?: selectedMode
     var gauge = 100.0
     val cooldowns = DoubleArray(4)
     val buffs = mutableMapOf<String,Double>()
@@ -141,13 +144,14 @@ class GameEngine(random: Random=Random.Default) {
     fun changeScreen(value: Screen) { if(value in listOf(Screen.TITLE,Screen.DEFEAT,Screen.REWARD,Screen.GAMEOVER,Screen.ENDING)) { bossMove=null; finisherBurst=null }; screen=value; screenAge=0.0; heldSkill=-1; moveX=0.0; moveY=0.0 }
     // The UI opts into the campaign. Combat simulations and existing fixtures stay independent.
     fun newRun(story: Boolean = false) {
-        run = Run(selectedJob,storyEnabled=story); resultRecorded=false; finalEnding=false
+        run = Run(selectedJob,storyEnabled=story,mode=selectedMode); resultRecorded=false; finalEnding=false
         pendingUpgrade=-1
         if(story) showStory(StoryMoment.PROLOGUE)
         else { changeScreen(Screen.INTRO); onCheckpoint?.invoke() }
     }
     fun resumeRun() {
         val r = run ?: return
+        selectedMode=r.mode
         pendingUpgrade=-1
         lootChosen = true
         resultRecorded=false; finalEnding=r.stage==31
@@ -427,7 +431,7 @@ class GameEngine(random: Random=Random.Default) {
         if(player.hp<=0) {
             val r=run ?: return
             r.totalDamage+=damageTaken; r.totalTime+=elapsed
-            r.score+=(3000*(1-boss.hp/boss.maxHp)).roundToInt()
+            r.score+=(3000*(1-boss.hp/boss.maxHp)).roundToInt()*r.mode.scoreMultiplier
             changeScreen(Screen.GAMEOVER); recordResult(false)
         }
     }
@@ -637,7 +641,7 @@ class GameEngine(random: Random=Random.Default) {
         return BossMove(kind,boss.x,boss.y,x,y,created.first(),if(kind==BossMoveKind.BLINK) .26 else profile.tempo)
     }
 
-    fun bossDamage() = BossDifficulty(run?.stage ?: 0).damage
+    fun bossDamage() = BossDifficulty(run?.stage ?: 0).damage*mode.damageMultiplier
 
     fun castNormal(slot: Int,ordinal: Int) {
         castNormalWave(NormalCue(elapsed,slot,0,ordinal,player.x,player.y))
@@ -795,7 +799,7 @@ class GameEngine(random: Random=Random.Default) {
         projectiles.clear(); iceMarks.clear(); particles.clear(); playerEffects.clear()
         castEnd=elapsed
         lastTime=elapsed; lastDamage=damageTaken
-        lastScore=scoreFor(elapsed,damageTaken)
+        lastScore=scoreFor(elapsed,damageTaken)*r.mode.scoreMultiplier
         lastGold=((60+r.stage*8)*(if(job==Job.THIEF) 1.6 else 1.0)*(if(fortune) 3 else 1)).roundToInt()
         r.score+=lastScore; r.gold+=lastGold; r.kills++; r.totalTime+=elapsed; r.totalDamage+=damageTaken; r.previousHp=boss.maxHp
         pendingUpgrade=-1; lootChosen=job!=Job.THIEF; finalEnding=r.stage==31
