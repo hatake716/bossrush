@@ -108,6 +108,7 @@ class FullscreenTest {
                 tap("♪ ON"); tap("♪ OFF")
                 tap("遊び方"); tap("戻る")
                 tap("はじめから  →"); tap("盗賊を選択"); tap("この職業で出発  →")
+                tap("この場面をスキップ"); tap("この場面をスキップ")
                 tap("戦闘開始  →"); tap("II")
                 val shot=instrumentation.uiAutomation.takeScreenshot(); save(shot,"fullscreen-device-$direction"); shot.recycle()
                 tap("タイトルへ")

@@ -22,8 +22,9 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     private val backgrounds=BackgroundArt(context.assets)
     private val battleEffects=BattleEffects()
     private val playerEffects=PlayerEffects()
+    internal val storyText=StoryText(context.assets)
     private val p=Paint().apply { isAntiAlias=false }
-    private val type=Paint().apply { isAntiAlias=true; typeface=Typeface.create("sans-serif",Typeface.NORMAL) }
+    private val type=Paint().apply { isAntiAlias=false; typeface=storyText.face }
     private val buttons=mutableListOf<UiButton>()
     internal var viewport=GameViewport.fit(960,540)
         private set
@@ -54,6 +55,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     private var lastFrame=0L; private var running=false
     private var clock=0.0
     private var lastScreen=Screen.TITLE
+    private var lastStoryPage=""
     private var windowChanged=false
     private var accessibilityButtons=emptyList<Pair<String,Boolean>>()
     private var joystickId=-1; private var stickX=0f; private var stickY=0f
@@ -93,7 +95,16 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         val dt=if(lastFrame==0L) .0 else (frameTimeNanos-lastFrame)/1e9
         lastFrame=frameTimeNanos; clock+=dt.coerceAtMost(.05)
         engine.update(dt)
-        val scene=when(engine.screen) { Screen.BATTLE,Screen.CUTIN,Screen.INTRO,Screen.PAUSED -> "battle"; Screen.SHOP,Screen.REWARD -> "shop"; Screen.ENDING -> "ending"; else -> "title" }
+        val scene=when(engine.screen) {
+            Screen.BATTLE,Screen.CUTIN,Screen.INTRO,Screen.PAUSED -> "battle"
+            Screen.SHOP,Screen.REWARD -> "shop"
+            Screen.ENDING -> "ending"
+            Screen.STORY -> when(engine.run?.storyMoment) {
+                StoryMoment.BEFORE -> "battle"; StoryMoment.AFTER -> "shop"
+                StoryMoment.EPILOGUE -> "ending"; else -> "title"
+            }
+            else -> "title"
+        }
         audio.music(scene,engine.run?.stage ?: 0)
         engine.sounds.toList().forEach { audio.effect(it) }; engine.sounds.clear()
         if(lastScreen!=engine.screen) {
@@ -109,6 +120,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     }
     fun screenName()=when(engine.screen) {
         Screen.TITLE -> "タイトル"; Screen.JOBS -> "職業選択"; Screen.INTRO -> "ボス紹介 ${engine.bossInfo.name}"
+        Screen.STORY -> "物語 ${MainStory.title(engine.run!!.storyMoment,engine.run!!.stage)}"
         Screen.BATTLE -> "戦闘 ${engine.bossInfo.name}"; Screen.CUTIN -> "必殺技 ${engine.bossInfo.ultimate}"
         Screen.REWARD -> "ボス撃破 技の成長"; Screen.SHOP -> "ショップ"; Screen.PAUSED -> "一時停止"
         Screen.GAMEOVER -> "ゲームオーバー"; Screen.ENDING -> "ゲームクリア"; Screen.CODEX -> "神話図鑑"; Screen.HELP -> "遊び方"
@@ -129,7 +141,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             Screen.BATTLE,Screen.CUTIN -> engine.pause()
             Screen.PAUSED -> engine.unpause()
             Screen.CODEX,Screen.HELP -> engine.changeScreen(returnScreen)
-            Screen.JOBS,Screen.INTRO,Screen.SHOP,Screen.GAMEOVER,Screen.ENDING -> engine.changeScreen(Screen.TITLE)
+            Screen.JOBS,Screen.STORY,Screen.INTRO,Screen.SHOP,Screen.GAMEOVER,Screen.ENDING -> engine.changeScreen(Screen.TITLE)
             Screen.REWARD -> engine.cancelUpgrade()
             else -> (context as? android.app.Activity)?.moveTaskToBack(true)
         }
@@ -176,7 +188,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         super.onDraw(canvas)
         updateViewport()
         canvas.drawColor(Ink.dark); canvas.save(); canvas.translate(ox,oy); canvas.scale(scale,scale)
-        if(engine.screen !in listOf(Screen.TITLE,Screen.ENDING,Screen.GAMEOVER)) {
+        if(engine.screen !in listOf(Screen.TITLE,Screen.STORY,Screen.ENDING,Screen.GAMEOVER)) {
             val v=viewport
             if(engine.run!=null && engine.screen in listOf(Screen.BATTLE,Screen.CUTIN,Screen.PAUSED,Screen.INTRO))
                 backgrounds.battle(canvas,engine.bossInfo.id,v.fullLeft,v.fullTop,v.fullWidth,v.fullHeight)
@@ -187,6 +199,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         when(engine.screen) {
             Screen.TITLE -> title(canvas)
             Screen.JOBS -> jobs(canvas)
+            Screen.STORY -> story(canvas)
             Screen.INTRO -> intro(canvas)
             Screen.BATTLE,Screen.CUTIN,Screen.PAUSED -> { battle(canvas); if(engine.screen==Screen.CUTIN) cutin(canvas); if(engine.screen==Screen.PAUSED) paused(canvas) }
             Screen.REWARD -> reward(canvas)
@@ -263,8 +276,46 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         val j=engine.selectedJob
         text(c,j.lore,37f,424f,16f)
         text(c,Skills.all.getValue(j).joinToString("  /  ") { it.name },37f,453f,14f,Ink.mid)
-        button(c,"この職業で出発  →",673f+extra,457f,251f,51f,true) { engine.newRun() }
+        button(c,"この職業で出発  →",673f+extra,457f,251f,51f,true) { engine.newRun(story=true) }
         pixel(c,"LEVEL 1 - 16",37f,496f,1.5f,Ink.mid)
+    }
+    private fun story(c: Canvas) {
+        val r=engine.run!!; val moment=r.storyMoment
+        val book=MainStory.chapters[r.stage]; val line=engine.storyLine
+        val chapterScene=moment==StoryMoment.BEFORE || moment==StoryMoment.AFTER
+        val color=moment==StoryMoment.EPILOGUE
+        val v=viewport
+        if(chapterScene) backgrounds.battle(c,book.id,v.fullLeft,v.fullTop,v.fullWidth,v.fullHeight)
+        else backgrounds.landscape(c,color,v.fullLeft,v.fullTop,v.fullWidth,v.fullHeight)
+        fullRect(c,Color.argb(if(color) 55 else 105,16,29,26))
+        header(c,"THE COLORLESS CHRONICLE")
+        // A dark title panel and full-width dialogue keep text clear of detailed art.
+        rect(c,36f,77f,535f+extra/2,191f,Color.argb(230,16,29,26))
+        border(c,36f,77f,535f+extra/2,191f,Ink.mid)
+        storyText.draw(c,if(chapterScene) MainStory.act(r.stage) else "色を取り戻す旅",55f,95f,16f,Ink.mid)
+        storyText.draw(c,MainStory.title(moment,r.stage),55f,130f,24f)
+        storyText.draw(c,"取り戻した色　${r.kills.coerceIn(0,32)}／３２",55f,185f,16f,Ink.mid)
+        for(i in 0..31) {
+            val xx=55f+(i%16)*28; val yy=217f+(i/16)*20
+            rect(c,xx,yy,18f,12f,if(i<r.kills) MainStory.chapters[i].color else Ink.deep)
+            border(c,xx,yy,18f,12f,if(i<r.kills) Ink.light else Ink.mid,1f)
+        }
+        if(chapterScene && line.speaker!="旅人") art.boss(c,book.id,745f+extra*.75f,300f,285f+extra/4,216f)
+        else art.sprite(c,art.heroKey(r.job),741f+extra*.75f,281f,3.3f,color=color)
+        val x=36f; val y=307f; val w=888f+extra
+        rect(c,x+4,y+5,w,212f,Ink.dark)
+        rect(c,x,y,w,212f,Ink.dark); border(c,x,y,w,212f,Ink.light,3f); border(c,x+7,y+7,w-14,198f,Ink.mid,1f)
+        rect(c,54f,293f,(line.speaker.length*16+32).toFloat(),31f,Ink.dark)
+        storyText.draw(c,line.speaker,70f,300f,16f)
+        pixel(c,"${r.storyPage+1} / ${engine.storyPages.size}",895f+extra,318f,1.3f,Ink.mid,true)
+        storyText.paragraph(c,line.text,60f,342f,840f+extra,24f,30f)
+        // Primary action is first in the virtual tree, so A advances naturally.
+        button(c,engine.storyAdvanceLabel,670f+extra,467f,230f,36f,true) { engine.advanceStory() }
+        button(c,"前のページ",60f,467f,145f,36f,enabled=r.storyPage>0) { engine.previousStoryPage() }
+        button(c,"この場面をスキップ",223f,467f,210f,36f) { engine.skipStory() }
+        val signature="${r.storyMoment}:${r.stage}:${r.storyPage}"
+        contentDescription="BOSSRUSH ${MainStory.title(moment,r.stage)}。${r.storyPage+1}ページ。${line.speaker}。${line.text}"
+        if(lastStoryPage!=signature) { lastStoryPage=signature; windowChanged=true }
     }
     private fun intro(c: Canvas) {
         val b=engine.bossInfo; val stage=engine.run!!.stage
@@ -501,7 +552,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         }
         button(c,"技の選択をキャンセル",36f,476f,211f,45f,enabled=e.pendingUpgrade>=0) { e.cancelUpgrade() }
         text(c,"進むと強化が確定します",278f,504f,14f,Ink.mid)
-        button(c,if(e.run!!.stage==31) "夜明けへ  →" else "旅の商人へ  →",674f+extra,476f,250f,45f,true,e.canFinishReward) { e.finishReward() }
+        button(c,if(e.run!!.storyEnabled) "物語のつづきへ →" else if(e.run!!.stage==31) "夜明けへ  →" else "旅の商人へ  →",674f+extra,476f,250f,45f,true,e.canFinishReward) { e.finishReward() }
     }
     private fun shop(c: Canvas) {
         val e=engine; val r=e.run!!
@@ -605,7 +656,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             "02  予兆を読む" to "斜線は危険地帯。突進は帯の横へ、飛び込みは着地点の円の外へ。輪・月印・白いルーンは内側へ。吹き飛ばしは中央へ。前後攻撃は切り返します。",
             "03  技と召喚" to "技にはゲージと待機時間が必要。召喚士は回復速度が半分で仲間は2体まで。はにわは正面を守り、再タップすると近接攻撃します。",
             "04  必殺技とアイテム" to "4番目の技はHP1/3以下で各ボス戦1回だけ使える必殺技。ゲージ消費なし。回復には薬草や白ウサギを使います。下のアイテムを選ぶと時間が止まり、効果を確認できます。かばんは5個まで。",
-            "05  成長と保存" to "撃破後に技を1つ選択。キャンセル・選び直しができ、次へ進むと確定します。Lv.16が最大。盗賊は特殊品も選択。戦闘前と買い物後に自動保存。",
+            "05  成長と物語" to "撃破後に技を選び、次へ進むと確定。Lv.16が最大。盗賊は特殊品も選択。物語は前後のページへ移動・スキップが可能。ページごと、戦闘前、買い物後に自動保存。",
             "06  高いスコアへ" to "素早く倒し、被ダメージを減らすと高得点。全32体を越えると世界に色が戻ります。物理キー：WASD/矢印で移動、1〜4で技、Escで一時停止。"
         )
         topics.forEachIndexed { i,pair ->
@@ -622,7 +673,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         pixel(c,if(clear) "THE WORLD" else "GAME OVER",40f,103f,4.5f,if(clear) Ink.dawn[3] else Ink.light)
         if(clear) pixel(c,"IN COLOR",40f,155f,4.5f,Ink.dawn[2])
         text(c,if(clear) "世界に、色が戻った。" else "夜は、まだ明けない。",40f,if(clear) 233f else 188f,26f,if(clear) Ink.dawn[3] else Ink.light)
-        wrap(c,if(clear) "最後の神が剣を下ろした。\n灰色だった葉に緑が、空に青が宿る。\n小さな勇者の旅は、誰かの明日になった。" else "倒れるたび、予兆は記憶になる。\n次の冒険では、きっと一歩先へ。",40f,if(clear) 274f else 234f,505f,16f,if(clear) Ink.dawn[3] else Ink.mid,26f)
+        wrap(c,if(clear) "最後の神が槍を下ろした。\n灰色だった葉に緑が、空に青が宿る。\n旅人の帰る道にも、新しい朝が来た。" else "倒れるたび、予兆は記憶になる。\n次の冒険では、きっと一歩先へ。",40f,if(clear) 274f else 234f,505f,16f,if(clear) Ink.dawn[3] else Ink.mid,26f)
         rect(c,39f,365f,462f,93f,Ink.dark); border(c,39f,365f,462f,93f,if(clear) Ink.dawn[2] else Ink.mid)
         pixel(c,"SCORE ${r.score.toString().padStart(6,'0')}",58f,383f,2.4f,if(clear) Ink.dawn[3] else Ink.light)
         text(c,"${r.job.label}  /  ${r.kills}体撃破  /  %.1f秒  /  被ダメージ %.0f".format(java.util.Locale.ROOT,r.totalTime,r.totalDamage),58f,438f,13f,if(clear) Ink.dawn[2] else Ink.mid)

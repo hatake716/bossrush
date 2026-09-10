@@ -23,6 +23,7 @@ jobs:
           python3 tools/check-art.py
           python3 tools/check-backgrounds.py
           python3 tools/check-music.py
+          python3 tools/check-story.py
       - name: Test, lint, and build
         run: ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease --no-daemon
       - uses: actions/upload-artifact@v4

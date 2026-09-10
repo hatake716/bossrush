@@ -50,6 +50,9 @@ class GameplayTest {
     private fun start(job: Job) {
         tap("はじめから  →"); tap("${job.label}を選択"); screenshot("job-${job.name}")
         tap("この職業で出発  →")
+        tap("この場面をスキップ"); tap("この場面をスキップ")
+        // These fixtures isolate combat/reward behavior. MainStoryUiTest covers the campaign.
+        instrumentation.runOnMainSync { rule.activity.gameView.engine.run!!.storyEnabled=false }
         // First decoding of detailed scenery can outlast the menu's frame delay.
         // Capture the presented encounter, rather than the preceding job selection.
         assertNotNull(device.wait(Until.findObject(By.desc("戦闘開始  →")),5000))

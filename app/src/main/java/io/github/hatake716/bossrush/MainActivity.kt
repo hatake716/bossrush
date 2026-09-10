@@ -8,8 +8,6 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
-import org.json.JSONArray
-import org.json.JSONObject
 
 class MainActivity: ComponentActivity() {
     lateinit var gameView: GameView
@@ -48,27 +46,9 @@ class MainActivity: ComponentActivity() {
     }
     private fun saveRun(run: Run?) {
         run ?: return
-        val json=JSONObject().put("version",1).put("job",run.job.name).put("stage",run.stage)
-            .put("levels",JSONArray(run.levels.toList())).put("inventory",JSONArray(run.inventory.map { it.name }))
-            .put("gold",run.gold).put("score",run.score).put("time",run.totalTime).put("damage",run.totalDamage)
-            .put("kills",run.kills).put("previousHp",run.previousHp).put("checkpoint",run.checkpoint)
-        prefs.edit().putString("run",json.toString()).apply(); gameView.hasSave=true
+        prefs.edit().putString("run",RunCodec.encode(run)).apply(); gameView.hasSave=true
     }
-    private fun loadRun(): Run? = try {
-        val str=prefs.getString("run",null)
-        if(str==null) null else {
-            val j=JSONObject(str)
-            require(j.getInt("version")==1)
-            val levels=j.getJSONArray("levels"); val inventory=j.getJSONArray("inventory")
-            require(levels.length()==4 && inventory.length()<=5)
-            val r=Run(Job.valueOf(j.getString("job")),j.getInt("stage"),IntArray(4) { levels.getInt(it).also { v -> require(v in 1..16) } },
-                j.getInt("gold"),MutableList(inventory.length()) { Item.valueOf(inventory.getString(it)) },j.getInt("score"),
-                j.getDouble("time"),j.getDouble("damage"),j.getInt("kills"),j.getDouble("previousHp"),j.getString("checkpoint"))
-            require(r.stage in 0..31 && r.gold>=0 && r.kills in 0..32 && r.checkpoint in listOf("INTRO","SHOP"))
-            require(r.totalTime.isFinite() && r.totalDamage.isFinite() && r.previousHp.isFinite())
-            r
-        }
-    } catch(_: Exception) { null }
+    private fun loadRun(): Run? = RunCodec.decode(prefs.getString("run",null))
     override fun onResume() { super.onResume(); if(::gameView.isInitialized) gameView.resume() }
     override fun onPause() { if(::gameView.isInitialized) gameView.suspend(); super.onPause() }
     override fun onDestroy() { if(::gameView.isInitialized) gameView.audio.stop(); super.onDestroy() }

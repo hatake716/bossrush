@@ -3,12 +3,14 @@ package io.github.hatake716.bossrush
 import kotlin.math.*
 import kotlin.random.Random
 
-enum class Screen { TITLE, JOBS, INTRO, BATTLE, CUTIN, REWARD, SHOP, PAUSED, GAMEOVER, ENDING, CODEX, HELP }
+enum class Screen { TITLE, JOBS, STORY, INTRO, BATTLE, CUTIN, REWARD, SHOP, PAUSED, GAMEOVER, ENDING, CODEX, HELP }
 data class Run(
     val job: Job, var stage: Int = 0, val levels: IntArray = intArrayOf(1,1,1,1),
     var gold: Int = 0, val inventory: MutableList<Item> = mutableListOf(Item.POTION, Item.POTION),
     var score: Int = 0, var totalTime: Double = 0.0, var totalDamage: Double = 0.0,
-    var kills: Int = 0, var previousHp: Double = 0.0, var checkpoint: String = "INTRO"
+    var kills: Int = 0, var previousHp: Double = 0.0, var checkpoint: String = "INTRO",
+    var storyEnabled: Boolean = false, var storyMoment: StoryMoment = StoryMoment.PROLOGUE,
+    var storyPage: Int = 0, var storyBeforeStage: Int = -1
 ) {
     fun copyForTrial() = Run(job, stage, levels.copyOf(), inventory = mutableListOf())
 }
@@ -135,16 +137,66 @@ class GameEngine(random: Random=Random.Default) {
     private var finalEnding = false
 
     fun changeScreen(value: Screen) { if(value in listOf(Screen.TITLE,Screen.REWARD,Screen.GAMEOVER,Screen.ENDING)) { bossMove=null; finisherBurst=null }; screen=value; screenAge=0.0; heldSkill=-1; moveX=0.0; moveY=0.0 }
-    fun newRun() {
-        run = Run(selectedJob); resultRecorded=false; finalEnding=false
+    // The UI opts into the campaign. Combat simulations and existing fixtures stay independent.
+    fun newRun(story: Boolean = false) {
+        run = Run(selectedJob,storyEnabled=story); resultRecorded=false; finalEnding=false
         pendingUpgrade=-1
-        changeScreen(Screen.INTRO); onCheckpoint?.invoke()
+        if(story) showStory(StoryMoment.PROLOGUE)
+        else { changeScreen(Screen.INTRO); onCheckpoint?.invoke() }
     }
     fun resumeRun() {
         val r = run ?: return
         pendingUpgrade=-1
         lootChosen = true
-        changeScreen(if (r.checkpoint == "SHOP") Screen.SHOP else Screen.INTRO)
+        resultRecorded=false; finalEnding=r.stage==31
+        when {
+            r.checkpoint=="STORY" && r.storyEnabled -> changeScreen(Screen.STORY)
+            r.checkpoint=="SHOP" -> changeScreen(Screen.SHOP)
+            r.storyEnabled && r.storyBeforeStage<r.stage -> showStory(StoryMoment.BEFORE)
+            else -> changeScreen(Screen.INTRO)
+        }
+    }
+    val storyPages get() = MainStory.pages(run?.storyMoment ?: StoryMoment.PROLOGUE,run?.stage ?: 0,job)
+    val storyLine get() = storyPages[(run?.storyPage ?: 0).coerceIn(storyPages.indices)]
+    val storyLastPage get() = run?.storyPage==storyPages.lastIndex
+    val storyAdvanceLabel get() = if(!storyLastPage) "次へ →" else when(run?.storyMoment) {
+        StoryMoment.PROLOGUE -> "最初の神へ →"
+        StoryMoment.BEFORE -> "戦いの準備へ →"
+        StoryMoment.AFTER -> if(run?.stage==31) "色を解き放つ →" else "旅の商人へ →"
+        else -> "旅の結末へ →"
+    }
+    private fun showStory(moment: StoryMoment) {
+        val r=run ?: return
+        r.storyMoment=moment; r.storyPage=0; r.checkpoint="STORY"
+        changeScreen(Screen.STORY); onCheckpoint?.invoke()
+    }
+    fun previousStoryPage(): Boolean {
+        val r=run ?: return false
+        if(screen!=Screen.STORY || r.storyPage<=0) return false
+        r.storyPage--; onCheckpoint?.invoke(); return true
+    }
+    fun advanceStory(): Boolean {
+        val r=run ?: return false
+        if(screen!=Screen.STORY) return false
+        if(!storyLastPage) { r.storyPage++; onCheckpoint?.invoke(); return true }
+        when(r.storyMoment) {
+            StoryMoment.PROLOGUE -> showStory(StoryMoment.BEFORE)
+            StoryMoment.BEFORE -> {
+                r.storyBeforeStage=r.stage; r.checkpoint="INTRO"
+                changeScreen(Screen.INTRO); onCheckpoint?.invoke()
+            }
+            StoryMoment.AFTER -> if(r.stage==31) showStory(StoryMoment.EPILOGUE) else {
+                r.stage++; r.checkpoint="SHOP"
+                changeScreen(Screen.SHOP); onCheckpoint?.invoke()
+            }
+            StoryMoment.EPILOGUE -> { changeScreen(Screen.ENDING); recordResult(true) }
+        }
+        return true
+    }
+    fun skipStory(): Boolean {
+        if(screen!=Screen.STORY) return false
+        run!!.storyPage=storyPages.lastIndex
+        return advanceStory()
     }
     fun beginBattle(reference: Boolean = false) {
         val r=run ?: return
@@ -758,7 +810,8 @@ class GameEngine(random: Random=Random.Default) {
         if(!canFinishReward) return
         // Apply only when leaving the reward screen, before saving the next checkpoint.
         levels[pendingUpgrade]++; pendingUpgrade=-1; sounds.add("buff")
-        if(finalEnding) { changeScreen(Screen.ENDING); recordResult(true) }
+        if(run!!.storyEnabled) showStory(StoryMoment.AFTER)
+        else if(finalEnding) { changeScreen(Screen.ENDING); recordResult(true) }
         else {
             run!!.stage++; run!!.checkpoint="SHOP"; changeScreen(Screen.SHOP); onCheckpoint?.invoke()
         }
@@ -773,7 +826,11 @@ class GameEngine(random: Random=Random.Default) {
     fun discardItem(index: Int) {
         if(screen==Screen.SHOP && index in run!!.inventory.indices) { run!!.inventory.removeAt(index); selectedItem=-1; onCheckpoint?.invoke() }
     }
-    fun leaveShop() { run?.checkpoint="INTRO"; changeScreen(Screen.INTRO); onCheckpoint?.invoke() }
+    fun leaveShop() {
+        if(screen!=Screen.SHOP) return
+        if(run?.storyEnabled==true) showStory(StoryMoment.BEFORE)
+        else { run?.checkpoint="INTRO"; changeScreen(Screen.INTRO); onCheckpoint?.invoke() }
+    }
     fun pause() { if(screen==Screen.BATTLE || screen==Screen.CUTIN) changeScreen(Screen.PAUSED) }
     fun unpause() { selectedItem=-1; changeScreen(if(cutinTime>0) Screen.CUTIN else Screen.BATTLE) }
     companion object {

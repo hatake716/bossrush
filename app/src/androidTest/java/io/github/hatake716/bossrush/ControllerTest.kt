@@ -78,7 +78,9 @@ class ControllerTest {
         assertEquals("盗賊を選択",read { it.controller.focusLabel })
         screenshot("controller-jobs")
         press(KeyEvent.KEYCODE_BUTTON_A); assertEquals(Job.THIEF,read { it.engine.selectedJob })
-        press(KeyEvent.KEYCODE_DPAD_DOWN); press(KeyEvent.KEYCODE_BUTTON_A); screen(Screen.INTRO)
+        press(KeyEvent.KEYCODE_DPAD_DOWN); press(KeyEvent.KEYCODE_BUTTON_A); screen(Screen.STORY)
+        repeat(MainStory.pages(StoryMoment.PROLOGUE,0,Job.THIEF).size+MainStory.chapters[0].before.size) { press(KeyEvent.KEYCODE_BUTTON_A) }
+        screen(Screen.INTRO)
         press(KeyEvent.KEYCODE_BUTTON_A); screen(Screen.BATTLE)
         val x=read { it.engine.player.x }
         motion(x=.8f); SystemClock.sleep(250); motion()
