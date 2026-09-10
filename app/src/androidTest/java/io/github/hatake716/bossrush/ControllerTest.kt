@@ -41,12 +41,13 @@ class ControllerTest {
         SystemClock.sleep(70)
     }
     private fun press(key: Int) { event(key,KeyEvent.ACTION_DOWN); event(key,KeyEvent.ACTION_UP); SystemClock.sleep(90) }
-    private fun motion(x: Float=0f,y: Float=0f,hx: Float=0f,hy: Float=0f,trigger: Float=0f) {
+    private fun motion(x: Float=0f,y: Float=0f,hx: Float=0f,hy: Float=0f,trigger: Float=0f,rightTrigger: Float=0f) {
         val properties=arrayOf(MotionEvent.PointerProperties().apply { id=0; toolType=MotionEvent.TOOL_TYPE_UNKNOWN })
         val coordinates=arrayOf(MotionEvent.PointerCoords().apply {
             setAxisValue(MotionEvent.AXIS_X,x); setAxisValue(MotionEvent.AXIS_Y,y)
             setAxisValue(MotionEvent.AXIS_HAT_X,hx); setAxisValue(MotionEvent.AXIS_HAT_Y,hy)
             setAxisValue(MotionEvent.AXIS_LTRIGGER,trigger)
+            setAxisValue(MotionEvent.AXIS_RTRIGGER,rightTrigger)
         })
         val time=SystemClock.uptimeMillis()
         val event=MotionEvent.obtain(time,time,MotionEvent.ACTION_MOVE,1,properties,coordinates,0,0,1f,1f,-1,0,InputDevice.SOURCE_JOYSTICK,0)
@@ -184,5 +185,71 @@ class ControllerTest {
         val gold=read { it.engine.run!!.gold }
         press(KeyEvent.KEYCODE_BUTTON_A)
         assertTrue(read { it.engine.run!!.gold }<gold)
+    }
+    @Test fun eachRewardStartsAtLeftmostSkillEvenWhenItIsMaxed() {
+        for(job in Job.entries) {
+            fixture(job); press(KeyEvent.KEYCODE_BUTTON_R2)
+            if(job==Job.WARRIOR) read { it.engine.levels[0]=16 }
+            read { it.engine.victory() }; screen(Screen.REWARD)
+            assertEquals(0,read { it.controller.focused()!!.upgradeSlot })
+            assertEquals(-1,read { it.engine.pendingUpgrade })
+            if(job==Job.WARRIOR) {
+                press(KeyEvent.KEYCODE_BUTTON_A)
+                assertEquals(-1,read { it.engine.pendingUpgrade }); assertEquals(16,read { it.engine.levels[0] })
+            }
+            repeat(3) { press(KeyEvent.KEYCODE_DPAD_RIGHT) }
+            assertEquals(3,read { it.controller.focused()!!.upgradeSlot })
+            press(KeyEvent.KEYCODE_BUTTON_A); press(KeyEvent.KEYCODE_BUTTON_B)
+            assertEquals(-1,read { it.engine.pendingUpgrade })
+            read { it.engine.beginBattle() }; screen(Screen.BATTLE)
+            read { it.engine.victory() }; screen(Screen.REWARD)
+            assertEquals(0,read { it.controller.focused()!!.upgradeSlot })
+            assertEquals(-1,read { it.engine.pendingUpgrade })
+            screenshot("reward-left-${job.name.lowercase()}")
+        }
+    }
+    @Test fun cutinWaitsAndFreshTapOrAnyGamepadButtonDismissesWithoutAnotherAction() {
+        fixture(); read { it.engine.damageBoss(it.engine.boss.maxHp) }; screen(Screen.CUTIN)
+        assertEquals(listOf("タップまたはボタンで戦闘へ"),read { it.controllerButtons().map { b -> b.label } })
+        val time=read { it.engine.elapsed }
+        read { repeat(600) { _ -> it.engine.update(.05) } }
+        assertEquals(Screen.CUTIN,read { it.engine.screen }); assertEquals(time,read { it.engine.elapsed },0.0)
+        screenshot("cutin-waits-for-input")
+        val position=read { it.viewport.screenX(720f+it.viewport.extra).toInt() to it.viewport.screenY(347f).toInt() }
+        device.click(position.first,position.second); screen(Screen.BATTLE)
+        assertEquals(0.0,read { it.engine.cooldowns[0] },0.0); assertEquals(-1,read { it.engine.heldSkill })
+        for(key in listOf(KeyEvent.KEYCODE_BUTTON_A,KeyEvent.KEYCODE_BUTTON_B,KeyEvent.KEYCODE_BUTTON_X,KeyEvent.KEYCODE_BUTTON_Y,
+            KeyEvent.KEYCODE_BUTTON_L1,KeyEvent.KEYCODE_BUTTON_R1,KeyEvent.KEYCODE_BUTTON_L2,KeyEvent.KEYCODE_BUTTON_R2,
+            KeyEvent.KEYCODE_BUTTON_START,KeyEvent.KEYCODE_BUTTON_SELECT,KeyEvent.KEYCODE_BUTTON_THUMBL,KeyEvent.KEYCODE_BUTTON_THUMBR,
+            KeyEvent.KEYCODE_BUTTON_C,KeyEvent.KEYCODE_BUTTON_Z,KeyEvent.KEYCODE_DPAD_UP,KeyEvent.KEYCODE_DPAD_RIGHT)) {
+            fixture(); read { it.engine.damageBoss(it.engine.boss.maxHp) }; screen(Screen.CUTIN)
+            press(key); screen(Screen.BATTLE)
+            assertEquals("key $key",-1,read { it.engine.heldSkill })
+            assertTrue(read { it.engine.cooldowns.all { cd -> cd==0.0 } })
+            assertEquals(2,read { it.engine.run!!.inventory.size })
+        }
+    }
+    @Test fun heldInputAndStickCannotSkipCutinButFreshTriggersAndDpadCan() {
+        fixture(); event(KeyEvent.KEYCODE_BUTTON_A,KeyEvent.ACTION_DOWN)
+        read { it.engine.damageBoss(it.engine.boss.maxHp) }; screen(Screen.CUTIN)
+        event(KeyEvent.KEYCODE_BUTTON_A,KeyEvent.ACTION_DOWN,1)
+        motion(x=.8f); assertEquals(Screen.CUTIN,read { it.engine.screen })
+        event(KeyEvent.KEYCODE_BUTTON_A,KeyEvent.ACTION_UP)
+        motion(rightTrigger=1f); screen(Screen.BATTLE)
+        assertEquals(-1,read { it.engine.heldSkill }); assertEquals(-1,read { it.engine.selectedItem })
+        motion()
+        fixture(); read { it.engine.damageBoss(it.engine.boss.maxHp) }; screen(Screen.CUTIN)
+        motion(trigger=1f); screen(Screen.BATTLE)
+        motion(trigger=1f); assertEquals(Screen.BATTLE,read { it.engine.screen })
+        motion()
+        fixture(); read { it.engine.damageBoss(it.engine.boss.maxHp) }; screen(Screen.CUTIN)
+        event(KeyEvent.KEYCODE_BUTTON_L2,KeyEvent.ACTION_DOWN); screen(Screen.BATTLE)
+        motion(trigger=1f); assertEquals(Screen.BATTLE,read { it.engine.screen })
+        assertEquals(-1,read { it.engine.selectedItem })
+        event(KeyEvent.KEYCODE_BUTTON_L2,KeyEvent.ACTION_UP); motion()
+        fixture(); motion(hx=1f)
+        read { it.engine.damageBoss(it.engine.boss.maxHp) }; screen(Screen.CUTIN)
+        motion(hx=1f); assertEquals(Screen.CUTIN,read { it.engine.screen })
+        motion(); motion(hy=1f); screen(Screen.BATTLE); motion()
     }
 }

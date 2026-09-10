@@ -65,7 +65,7 @@ class BossCombatRenderTest {
                 e.player=Actor(300.0,265.0,150.0,150.0); e.boss=Actor(300.0,125.0,900.0,900.0)
                 val attacks=BossCombat.forBoss(boss.id)
                 for(slot in attacks.indices) {
-                    e.hazards.clear(); e.impacts.clear(); e.normalCues.clear(); e.cues.clear(); e.cutinTime=0.0
+                    e.hazards.clear(); e.impacts.clear(); e.normalCues.clear(); e.cues.clear(); e.dismissCutin()
                     e.castNormal(slot,0); e.hazards.forEach { it.time=it.delay*.60 }
                     view.draw(Canvas(frame))
                     assertEquals(Ink.light,frame.getPixel(328,361))

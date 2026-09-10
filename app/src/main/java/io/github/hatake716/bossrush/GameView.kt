@@ -10,7 +10,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import kotlin.math.*
 
-data class UiButton(val label: String,val rect: RectF,val enabled: Boolean=true,val skill: Int=-1,val action: () -> Unit)
+data class UiButton(val label: String,val rect: RectF,val enabled: Boolean=true,val skill: Int=-1,val upgradeSlot: Int=-1,val action: () -> Unit)
 
 class GameView(context: Context,val engine: GameEngine): View(context), Choreographer.FrameCallback {
     val audio=Chiptune(context)
@@ -22,6 +22,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     private val backgrounds=BackgroundArt(context.assets)
     private val battleEffects=BattleEffects()
     private val playerEffects=PlayerEffects()
+    private val defeatEffects=BossDefeatEffects()
     internal val storyText=StoryText(context.assets)
     private val p=Paint().apply { isAntiAlias=false }
     private val type=Paint().apply { isAntiAlias=false; typeface=storyText.face }
@@ -63,6 +64,8 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     private var touchSkill=-1
     internal val controller=GameController(this)
     internal fun controllerButtons(): List<UiButton> = buttons
+    internal var buttonsScreen=Screen.TITLE; private set
+    private var consumeCutinTouch=false
     private var pressed: String?=null
     private var codexPage=0
     private var portraitExpanded=false
@@ -96,7 +99,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         lastFrame=frameTimeNanos; clock+=dt.coerceAtMost(.05)
         engine.update(dt)
         val scene=when(engine.screen) {
-            Screen.BATTLE,Screen.CUTIN,Screen.INTRO,Screen.PAUSED -> "battle"
+            Screen.BATTLE,Screen.CUTIN,Screen.DEFEAT,Screen.INTRO,Screen.PAUSED -> "battle"
             Screen.SHOP,Screen.REWARD -> "shop"
             Screen.ENDING -> "ending"
             Screen.STORY -> when(engine.run?.storyMoment) {
@@ -115,14 +118,14 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         invalidate()
         // Battle tracks display vsync. Menus leave idle time for Android lifecycle,
         // accessibility and input dispatch, and need far fewer redraws.
-        val delay=when(engine.screen) { Screen.BATTLE,Screen.CUTIN -> 0L; Screen.TITLE,Screen.ENDING -> 33L; else -> 70L }
+        val delay=when(engine.screen) { Screen.BATTLE,Screen.CUTIN,Screen.DEFEAT -> 0L; Screen.TITLE,Screen.ENDING -> 33L; else -> 70L }
         Choreographer.getInstance().postFrameCallbackDelayed(this,delay)
     }
     fun screenName()=when(engine.screen) {
         Screen.TITLE -> "タイトル"; Screen.JOBS -> "職業選択"; Screen.INTRO -> "ボス紹介 ${engine.bossInfo.name}"
         Screen.STORY -> "物語 ${MainStory.title(engine.run!!.storyMoment,engine.run!!.stage)}"
         Screen.BATTLE -> "戦闘 ${engine.bossInfo.name}"; Screen.CUTIN -> "必殺技 ${engine.bossInfo.ultimate}"
-        Screen.REWARD -> "ボス撃破 技の成長"; Screen.SHOP -> "ショップ"; Screen.PAUSED -> "一時停止"
+        Screen.DEFEAT -> "ボス撃破 爆散"; Screen.REWARD -> "ボス撃破 技の成長"; Screen.SHOP -> "ショップ"; Screen.PAUSED -> "一時停止"
         Screen.GAMEOVER -> "ゲームオーバー"; Screen.ENDING -> "ゲームクリア"; Screen.CODEX -> "神話図鑑"; Screen.HELP -> "遊び方"
     }
     private fun resetInput() {
@@ -143,6 +146,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             Screen.CODEX,Screen.HELP -> engine.changeScreen(returnScreen)
             Screen.JOBS,Screen.STORY,Screen.INTRO,Screen.SHOP,Screen.GAMEOVER,Screen.ENDING -> engine.changeScreen(Screen.TITLE)
             Screen.REWARD -> engine.cancelUpgrade()
+            Screen.DEFEAT -> Unit
             else -> (context as? android.app.Activity)?.moveTaskToBack(true)
         }
     }
@@ -173,13 +177,13 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         rect(c,x+3,y+4,w,h,Ink.dark); rect(c,x,y,w,h,fill)
         border(c,x,y,w,h,if(enabled) Ink.mid else Ink.deep)
         text(c,label,x+w/2,y+h/2+5,15f,if(!enabled) Ink.mid else if(primary||over) Ink.dark else Ink.light,Paint.Align.CENTER)
-        buttons.add(UiButton(label,RectF(x,y,x+w,y+h),enabled,skill,action))
+        buttons.add(UiButton(label,RectF(x,y,x+w,y+h),enabled,skill,action=action))
     }
     private fun header(c: Canvas,section: String,back: Boolean=true) {
         shifted(c,0f,headerTop) {
             rect(c,viewport.fullLeft,0f,viewport.fullWidth,57f,Ink.dark); rect(c,24f,55f,912f+extra,1f,Ink.mid)
             art.icon(c,"sword",28f,16f,1.6f); pixel(c,"BOSSRUSH",64f,19f,2.4f)
-            pixel(c,if(controller.active && engine.screen !in listOf(Screen.BATTLE,Screen.CUTIN)) "A:OK / B:BACK" else section,300f,22f,1.5f,Ink.mid)
+            pixel(c,if(controller.active && engine.screen !in listOf(Screen.BATTLE,Screen.CUTIN,Screen.DEFEAT)) "A:OK / B:BACK" else section,300f,22f,1.5f,Ink.mid)
             button(c,if(audio.enabled) "♪ ON" else "♪ OFF",803f+extra,12f,66f,31f) { audio.enabled=!audio.enabled; onSoundChanged?.invoke(audio.enabled) }
             if(back) button(c,"戻る",880f+extra,12f,57f,31f) { goBack() }
         }
@@ -188,19 +192,28 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         super.onDraw(canvas)
         updateViewport()
         canvas.drawColor(Ink.dark); canvas.save(); canvas.translate(ox,oy); canvas.scale(scale,scale)
+        if(engine.screen==Screen.DEFEAT) {
+            val shake=defeatEffects.shake(engine.screenAge)
+            canvas.translate(shake.first,shake.second)
+        }
         if(engine.screen !in listOf(Screen.TITLE,Screen.STORY,Screen.ENDING,Screen.GAMEOVER)) {
             val v=viewport
-            if(engine.run!=null && engine.screen in listOf(Screen.BATTLE,Screen.CUTIN,Screen.PAUSED,Screen.INTRO))
+            if(engine.run!=null && engine.screen in listOf(Screen.BATTLE,Screen.CUTIN,Screen.DEFEAT,Screen.PAUSED,Screen.INTRO))
                 backgrounds.battle(canvas,engine.bossInfo.id,v.fullLeft,v.fullTop,v.fullWidth,v.fullHeight)
             else backgrounds.landscape(canvas,false,v.fullLeft,v.fullTop,v.fullWidth,v.fullHeight)
             fullRect(canvas,Color.argb(220,16,29,26))
         }
-        buttons.clear()
+        buttons.clear(); buttonsScreen=engine.screen
         when(engine.screen) {
             Screen.TITLE -> title(canvas)
             Screen.JOBS -> jobs(canvas)
             Screen.STORY -> story(canvas)
             Screen.INTRO -> intro(canvas)
+            Screen.DEFEAT -> {
+                battle(canvas); buttons.clear()
+                fullRect(canvas,defeatEffects.flash(engine.screenAge,engine.bossInfo.id))
+                if(engine.screenAge>.9) pixel(canvas,"BOSS DEFEATED",480f+extra/2,240f,4f,UltimateColors.forBoss(engine.bossInfo.id).core,true)
+            }
             Screen.BATTLE,Screen.CUTIN,Screen.PAUSED -> { battle(canvas); if(engine.screen==Screen.CUTIN) cutin(canvas); if(engine.screen==Screen.PAUSED) paused(canvas) }
             Screen.REWARD -> reward(canvas)
             Screen.SHOP -> shop(canvas)
@@ -209,7 +222,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             Screen.GAMEOVER -> result(canvas,false)
             Screen.ENDING -> result(canvas,true)
         }
-        if(controller.active && engine.screen !in listOf(Screen.BATTLE,Screen.CUTIN)) controller.focused()?.let { b ->
+        if(controller.active && engine.screen !in listOf(Screen.BATTLE,Screen.CUTIN,Screen.DEFEAT)) controller.focused()?.let { b ->
             val r=b.rect
             border(canvas,r.left-4,r.top-4,r.width()+8,r.height()+8,Ink.light,2f)
             rect(canvas,r.left-7,r.centerY()-4,5f,8f,Ink.light)
@@ -382,7 +395,8 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
                 art.boss(c,b.id,at.first.toFloat(),(at.second+5-trailLift).toFloat(),160f,110f,alpha=65-i*20)
             }
         }
-        art.boss(c,b.id,e.boss.x.toFloat(),e.boss.y.toFloat()+5-lift+sin(clock*3).toFloat()*2,160f,110f,alpha=motion?.opacity ?: 255)
+        if(e.screen==Screen.DEFEAT) defeatEffects.draw(c,art,b.id,e.boss.x.toFloat(),e.boss.y.toFloat()+5,e.screenAge)
+        else art.boss(c,b.id,e.boss.x.toFloat(),e.boss.y.toFloat()+5-lift+sin(clock*3).toFloat()*2,160f,110f,alpha=motion?.opacity ?: 255)
         p.color=Ink.light; p.style=Paint.Style.STROKE; p.strokeWidth=1f
         c.drawOval(e.boss.x.toFloat()-34,e.boss.y.toFloat()-9,e.boss.x.toFloat()+34,e.boss.y.toFloat()+17,p)
         p.style=Paint.Style.FILL
@@ -478,6 +492,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     private fun scrim(c: Canvas) { fullRect(c,Color.argb(225,16,29,26)); buttons.clear() }
     private fun cutin(c: Canvas) {
         scrim(c)
+        buttons.add(UiButton("タップまたはボタンで戦闘へ",RectF(170f+extra/2,486f,790f+extra/2,532f)) { engine.dismissCutin() })
         val b=engine.bossInfo
         val colors=UltimateColors.forBoss(b.id)
         battleEffects.cutin(c,b.id,viewport.fullLeft,130f,viewport.fullWidth,264f,engine.screenAge)
@@ -489,7 +504,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             text(c,b.name,490f,321f,18f,colors.accent)
             text(c,"残り1/2 ── 神々の真なる力",480f,100f,18f,colors.core,Paint.Align.CENTER)
             wrap(c,b.hint,170f,430f,620f,19f,Ink.light,30f)
-            pixel(c,"READ THE SIGNS",480f,502f,1.7f,Ink.mid,true)
+            text(c,"タップ ／ コントローラーのボタンで戦闘へ",480f,517f,16f,colors.core,Paint.Align.CENTER)
         }
     }
     private fun paused(c: Canvas) {
@@ -535,7 +550,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             text(c,Skills.detail(e.job,i,preview),x+16,y+if(thief) 91 else 99,11f,Ink.mid)
             text(c,Skills.rangeDetail(e.job,i,preview),x+16,y+if(thief) 107 else 117,10f,if(selected) Ink.light else Ink.mid)
             if(!thief) wrap(c,Skills.description(e.job,i,preview),x+16,y+135,178f,11f,Ink.mid,16f)
-            buttons.add(UiButton("${s.name}を選択",RectF(x,y,x+211,y+(if(thief) 113 else 157)),e.levels[i]<16) { e.selectUpgrade(i) })
+            buttons.add(UiButton("${s.name}を選択",RectF(x,y,x+211,y+(if(thief) 113 else 157)),e.levels[i]<16,upgradeSlot=i) { e.selectUpgrade(i) })
         }
         if(thief) {
             text(c,if(e.lootChosen) "特殊アイテムを獲得しました" else "盗賊の戦利品：4つから1つ選ぶ",37f,364f,16f)
@@ -650,12 +665,12 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             "01  接続と移動" to "AndroidにBluetoothまたはUSBで接続して操作。左スティック／十字キーで移動します。スティックは倒し具合で速度が変わります。",
             "02  4つの技" to "A＝技1、B＝技2、X＝技3、Y＝技4。押し続けると連続使用。ボタンの配置は機種で異なるので、戦闘画面のA・B・X・Y表示を確認しましょう。",
             "03  アイテム" to "L1／R1でかばんの選択枠を移動。L2で時間を止めて効果を確認。Aで使用、Bでキャンセルします。何度も押しても一度に1個だけ使います。",
-            "04  メニューと一時停止" to "左スティック／十字キーで白い選択枠を移動、Aで決定、Bで戻ります。強化画面ではBで選択を取消。STARTで一時停止／再開します。",
-            "05  ボタン表記" to "A／B／X／YはAndroidの標準ボタン名です。L1・R1は上側の肩ボタン、L2は左トリガー。確認ダイアログ内の選択には十字キーを使います。",
+            "04  メニューと一時停止" to "左スティック／十字キーで白い選択枠を移動、Aで決定、Bで戻ります。強化画面は毎回左端から。Bで選択を取消。STARTで一時停止／再開。",
+            "05  ボタン表記" to "A／B／X／YはAndroidの標準ボタン名です。L1・R1は上側の肩ボタン、L2は左トリガー。カットインはどのボタンでも閉じられます。",
             "06  安心して再開" to "操作中のコントローラーが切断されると戦闘を一時停止します。再接続してSTARTで再開。タッチ操作にもいつでも切り替えられます。"
         ) else listOf(
             "01  移動と攻撃" to "戦場の左半分をドラッグして移動。右の技をタップ、長押しで連続使用。攻撃は自動でボスの方向を狙います。足元の丸が当たり判定です。",
-            "02  予兆を読む" to "斜線は危険地帯。突進は帯の横へ、飛び込みは着地点の円の外へ。輪・月印・白いルーンは内側へ。吹き飛ばしは中央へ。前後攻撃は切り返します。",
+            "02  予兆を読む" to "斜線は危険地帯。突進は帯の横へ、飛び込みは着地点の円の外へ。カットインはタップかボタンで閉じるまで時間が止まります。輪・月印・白いルーンは内側へ。",
             "03  技と召喚" to "技にはゲージと待機時間が必要。召喚士は回復速度が半分で仲間は2体まで。はにわは成長で耐久1〜4回・5〜20秒。再タップで近接攻撃。白ウサギの回復は8〜16。",
             "04  必殺技とアイテム" to "4番目の技はHP1/3以下で各ボス戦1回だけ使える必殺技。ゲージ消費なし。回復には薬草や白ウサギを使います。下のアイテムを選ぶと時間が止まり、効果を確認できます。かばんは5個まで。",
             "05  成長と物語" to "撃破後に技を選び、次へ進むと確定。Lv.16が最大。盗賊は特殊品も選択。物語は前後のページへ移動・スキップが可能。ページごと、戦闘前、買い物後に自動保存。",
@@ -689,6 +704,19 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if(consumeCutinTouch) {
+            if(event.actionMasked==MotionEvent.ACTION_UP || event.actionMasked==MotionEvent.ACTION_CANCEL) consumeCutinTouch=false
+            return true
+        }
+        if(engine.screen==Screen.DEFEAT) return true
+        if(engine.screen==Screen.CUTIN) {
+            // Only a new gesture dismisses it, never the release of the attack that opened it.
+            if(event.actionMasked==MotionEvent.ACTION_DOWN) {
+                controller.touch(); resetInput(); engine.dismissCutin(); consumeCutinTouch=true
+                performClick(); invalidate()
+            }
+            return true
+        }
         val index=event.actionIndex; val id=event.getPointerId(index)
         val x=(event.getX(index)-ox)/scale; val y=(event.getY(index)-oy)/scale
         when(event.actionMasked) {

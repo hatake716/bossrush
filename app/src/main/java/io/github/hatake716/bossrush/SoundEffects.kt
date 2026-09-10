@@ -13,7 +13,7 @@ object SoundEffects {
         "focus" to .42, "speed" to .27, "hurt" to .25,
         "limit-slash" to .42, "limit-flare" to .52, "limit-summon" to .8, "limit-vanish" to .65,
         "coin" to .28, "heal" to .48, "ultimate" to .75, "cast" to .25,
-        "buff" to .32, "victory" to .70, "click" to .07
+        "boss-defeat" to 1.1, "buff" to .32, "victory" to .70, "click" to .07
     )
     fun sample(time: Double,kind: String): Double {
         val duration=durations[kind] ?: return .0
@@ -61,6 +61,7 @@ object SoundEffects {
             "ultimate" -> (tone(68.0,80.0,.5)*.45+noise*.3)*(1-u)*(.75+.25*sin(t*36))
             "cast" -> tone(240.0,1000.0,.125)*exp(-t*11)*.40
             "buff" -> flourish(550.0)*.45
+            "boss-defeat" -> (noise*.64+sin(2*PI*(48*t+2.4*(1-exp(-t*28))))*.32)*exp(-t*4)
             "victory" -> flourish(523.25)*.60
             else -> tone(950.0)*exp(-t*60)*.40
         }

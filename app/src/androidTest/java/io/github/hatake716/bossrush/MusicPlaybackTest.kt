@@ -99,7 +99,7 @@ class MusicPlaybackTest {
                 view.engine.screen = Screen.PAUSED
             }
             await("Battle scene routes to Thor") { view.audio.playingId == "thor" && view.audio.renderedPeak > 0 }
-            ins.runOnMainSync { view.engine.victory() }
+            ins.runOnMainSync { view.engine.unpause(); view.engine.victory() }
             await("Reward routes to shop") { view.audio.playingId == "shop" && view.audio.renderedPeak > 0 }
             ins.runOnMainSync { view.engine.screen = Screen.ENDING }
             await("Color ending routes to the ending score") { view.audio.playingId == "ending" && view.audio.renderedPeak > 0 }

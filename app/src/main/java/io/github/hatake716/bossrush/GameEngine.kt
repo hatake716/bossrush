@@ -3,7 +3,7 @@ package io.github.hatake716.bossrush
 import kotlin.math.*
 import kotlin.random.Random
 
-enum class Screen { TITLE, JOBS, STORY, INTRO, BATTLE, CUTIN, REWARD, SHOP, PAUSED, GAMEOVER, ENDING, CODEX, HELP }
+enum class Screen { TITLE, JOBS, STORY, INTRO, BATTLE, CUTIN, DEFEAT, REWARD, SHOP, PAUSED, GAMEOVER, ENDING, CODEX, HELP }
 data class Run(
     val job: Job, var stage: Int = 0, val levels: IntArray = intArrayOf(1,1,1,1),
     var gold: Int = 0, val inventory: MutableList<Item> = mutableListOf(Item.POTION, Item.POTION),
@@ -106,9 +106,10 @@ class GameEngine(random: Random=Random.Default) {
     var ultimateUsed = false
     var ultimateCount = 0
         private set
-    val ultimateActive get()=cutinTime>0 || cues.isNotEmpty() || hazards.any { it.ultimate && !it.resolved } || impacts.any { it.hazard.ultimate }
+    val ultimateActive get()=awaitingCutin || cues.isNotEmpty() || hazards.any { it.ultimate && !it.resolved } || impacts.any { it.hazard.ultimate }
     val enraged get() = ultimateUsed && boss.hp > 0 && boss.hp <= boss.maxHp*.25
-    var cutinTime = 0.0
+    var awaitingCutin = false
+        private set
     var patternNumber = 0
     var nextPattern = 1.5*BossTiming.SCALE
     var castName = ""
@@ -137,7 +138,7 @@ class GameEngine(random: Random=Random.Default) {
     private var trial = false
     private var finalEnding = false
 
-    fun changeScreen(value: Screen) { if(value in listOf(Screen.TITLE,Screen.REWARD,Screen.GAMEOVER,Screen.ENDING)) { bossMove=null; finisherBurst=null }; screen=value; screenAge=0.0; heldSkill=-1; moveX=0.0; moveY=0.0 }
+    fun changeScreen(value: Screen) { if(value in listOf(Screen.TITLE,Screen.DEFEAT,Screen.REWARD,Screen.GAMEOVER,Screen.ENDING)) { bossMove=null; finisherBurst=null }; screen=value; screenAge=0.0; heldSkill=-1; moveX=0.0; moveY=0.0 }
     // The UI opts into the campaign. Combat simulations and existing fixtures stay independent.
     fun newRun(story: Boolean = false) {
         run = Run(selectedJob,storyEnabled=story); resultRecorded=false; finalEnding=false
@@ -209,7 +210,7 @@ class GameEngine(random: Random=Random.Default) {
         bossMove=null; bossOldX=boss.x; bossOldY=boss.y; nextIdleTarget=0.0
         elapsed=0.0; damageTaken=0.0; damageDone=0.0; invulnerability=0.0
         playerFinisherUsed=false; playerFinisherHits=0; finisherBurst=null
-        ultimateUsed=false; ultimateCount=0; cutinTime=0.0; patternNumber=0; nextPattern=1.6*BossTiming.SCALE
+        ultimateUsed=false; ultimateCount=0; awaitingCutin=false; patternNumber=0; nextPattern=1.6*BossTiming.SCALE
         message="予兆の外へ移動。技を押して攻撃！"; messageTime=4.0
         pendingUpgrade=-1; lootChosen=false; stolen=false; pendingLoot=null; fortune=false
         castName=""; castEnd=0.0; castDuration=0.0; selectedItem=-1
@@ -384,8 +385,15 @@ class GameEngine(random: Random=Random.Default) {
         hazards.clear(); impacts.clear(); cues.clear(); normalCues.clear()
         castName=bossInfo.ultimate; castHint=bossInfo.hint; sounds.add("ultimate")
         if(ultimateCount==1) {
-            changeScreen(Screen.CUTIN); cutinTime=3.0
+            awaitingCutin=true; changeScreen(Screen.CUTIN)
         } else beginUltimateSequence()
+    }
+    fun dismissCutin(): Boolean {
+        if(screen!=Screen.CUTIN) return false
+        awaitingCutin=false
+        changeScreen(Screen.BATTLE)
+        beginUltimateSequence()
+        return true
     }
     private fun beginUltimateSequence() {
         // Repeated ultimates keep combat, movement and held attacks running.
@@ -448,13 +456,9 @@ class GameEngine(random: Random=Random.Default) {
     fun update(rawDt: Double) {
         val dt=rawDt.coerceIn(0.0,.05)
         screenAge+=dt
-        if(screen==Screen.CUTIN) {
-            cutinTime-=dt
-            if(cutinTime<=0) {
-                cutinTime=0.0
-                changeScreen(Screen.BATTLE)
-                beginUltimateSequence()
-            }
+        if(screen==Screen.CUTIN) return
+        if(screen==Screen.DEFEAT) {
+            if(screenAge>=DEFEAT_DURATION) { changeScreen(Screen.REWARD); sounds.add("victory") }
             return
         }
         if(screen!=Screen.BATTLE) return
@@ -784,14 +788,19 @@ class GameEngine(random: Random=Random.Default) {
     }
 
     fun victory() {
+        if(screen!=Screen.BATTLE) return
         val r=run ?: return
+        boss.hp=0.0; awaitingCutin=false
+        hazards.clear(); impacts.clear(); cues.clear(); normalCues.clear()
+        projectiles.clear(); iceMarks.clear(); particles.clear(); playerEffects.clear()
+        castEnd=elapsed
         lastTime=elapsed; lastDamage=damageTaken
         lastScore=scoreFor(elapsed,damageTaken)
         lastGold=((60+r.stage*8)*(if(job==Job.THIEF) 1.6 else 1.0)*(if(fortune) 3 else 1)).roundToInt()
         r.score+=lastScore; r.gold+=lastGold; r.kills++; r.totalTime+=elapsed; r.totalDamage+=damageTaken; r.previousHp=boss.maxHp
         pendingUpgrade=-1; lootChosen=job!=Job.THIEF; finalEnding=r.stage==31
         // Rewards remain an atomic checkpoint: reloading before choosing restarts this battle.
-        changeScreen(Screen.REWARD); sounds.add("victory")
+        changeScreen(Screen.DEFEAT); sounds.add("boss-defeat")
     }
     fun selectUpgrade(slot: Int): Boolean {
         if(screen!=Screen.REWARD || slot !in 0..3 || levels[slot]>=16) return false
@@ -838,8 +847,9 @@ class GameEngine(random: Random=Random.Default) {
         else { run?.checkpoint="INTRO"; changeScreen(Screen.INTRO); onCheckpoint?.invoke() }
     }
     fun pause() { if(screen==Screen.BATTLE || screen==Screen.CUTIN) changeScreen(Screen.PAUSED) }
-    fun unpause() { selectedItem=-1; changeScreen(if(cutinTime>0) Screen.CUTIN else Screen.BATTLE) }
+    fun unpause() { selectedItem=-1; changeScreen(if(awaitingCutin) Screen.CUTIN else Screen.BATTLE) }
     companion object {
+        const val DEFEAT_DURATION = 1.8
         fun scoreFor(time: Double, damage: Double): Int = 10000 + max(0.0,9000-time*150).roundToInt() + max(0.0,6000-damage*40).roundToInt()
     }
 }

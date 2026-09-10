@@ -51,7 +51,7 @@ class MainStoryTest {
         var e=campaign(); e.skipStory(); e.skipStory()
         for(stage in 0..31) {
             assertEquals(stage,e.run!!.stage); e.beginBattle(); e.elapsed=30.0; e.damageTaken=2.0
-            e.victory(); assertEquals(Screen.REWARD,e.screen)
+            e.victory(); e.finishDefeatAnimation(); assertEquals(Screen.REWARD,e.screen)
             e.selectUpgrade(stage%4); e.finishReward()
             assertEquals(Screen.STORY,e.screen); assertEquals(StoryMoment.AFTER,e.run!!.storyMoment)
             assertEquals(stage+1,e.run!!.kills)

@@ -78,7 +78,7 @@ class PlayerGrowthRenderTest {
                 assertEquals(before,e.damageTaken,0.0)
                 assertEquals("$job Lv.$level collision marker",Ink.light,frame.getPixel((28+e.player.x).toInt(),(96+e.player.y).toInt()))
                 save(frame,"growth-overlap-${job.name.lowercase()}-$level")
-                e.victory(); e.selectUpgrade(0); view.draw(Canvas(frame)); save(frame,"growth-reward-${job.name.lowercase()}-$level")
+                e.victory(); repeat(37) { e.update(.05) }; e.selectUpgrade(0); view.draw(Canvas(frame)); save(frame,"growth-reward-${job.name.lowercase()}-$level")
             }
             frame.recycle(); view.suspend()
         }

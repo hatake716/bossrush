@@ -68,7 +68,7 @@ class PlayerFinisherTest {
             val e=battle(job); e.boss=Actor(300.0,145.0,5010.0,10000.0)
             val total=e.power(3)*(if(job==Job.WARRIOR) 10 else 5)
             e.useSkill(3); assertEquals(Screen.CUTIN,e.screen); assertEquals(10.0,e.damageDone,1e-7)
-            tick(e,3.01)
+            tick(e,10.0); assertEquals(Screen.CUTIN,e.screen); e.dismissCutin()
             e.hazards.clear(); e.cues.clear(); e.normalCues.clear(); e.nextPattern=1e6; e.invulnerability=1e6
             tick(e,1.1)
             assertEquals(total,e.damageDone,1e-7)
@@ -78,7 +78,7 @@ class PlayerFinisherTest {
     }
     @Test fun defeatAndNewEncounterDiscardRemainingHits() {
         val e=battle(Job.MAGE); e.ultimateUsed=true; e.boss.hp=10.0
-        e.useSkill(3); assertEquals(Screen.REWARD,e.screen); assertEquals(1,e.run!!.kills)
+        e.useSkill(3); assertEquals(Screen.DEFEAT,e.screen); assertEquals(1,e.run!!.kills)
         assertFalse(e.playerFinisherActive); tick(e,2.0); assertEquals(1,e.run!!.kills)
         e.beginBattle(); tick(e,.1); assertEquals(0.0,e.damageDone,0.0); assertFalse(e.playerFinisherUsed)
         e.player.hp=1.0; e.useSkill(3); e.hurt(10000.0)

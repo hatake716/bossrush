@@ -85,14 +85,14 @@ class BossCombatTest {
         e.damageBoss(900.0)
         assertEquals(450.0,e.boss.hp,.001); assertEquals(Screen.CUTIN,e.screen)
         assertTrue(e.normalCues.isEmpty()); assertTrue(e.hazards.isEmpty())
-        e.pause(); val cutin=e.cutinTime; repeat(100) { e.update(.05) }
-        assertEquals(cutin,e.cutinTime,.0)
-        e.unpause(); repeat(65) { e.update(.05) }
+        e.pause(); val cutin=e.awaitingCutin; repeat(100) { e.update(.05) }
+        assertEquals(cutin,e.awaitingCutin)
+        e.unpause(); e.dismissCutin(); repeat(65) { e.update(.05) }
         assertTrue(e.hazards.all { it.ultimate }); assertTrue(e.ultimateActive)
         val count=e.ultimateCount; e.beginBattle()
         assertTrue(count>0); assertEquals(0,e.ultimateCount); assertFalse(e.ultimateUsed); assertTrue(e.normalCues.isEmpty())
         e.damageBoss(e.boss.maxHp)
-        assertEquals(Screen.CUTIN,e.screen); assertEquals(1,e.ultimateCount); assertEquals(3.0,e.cutinTime,.0)
+        assertEquals(Screen.CUTIN,e.screen); assertEquals(1,e.ultimateCount); assertTrue(e.awaitingCutin)
     }
     @Test fun fullEncountersMixRepeatedUltimatesWithNormalsWithoutOverlappingSequences() {
         fun fight(seed: Int): List<String> {
@@ -108,7 +108,7 @@ class BossCombatTest {
                     assertEquals(if(e.ultimateCount==1) Screen.CUTIN else Screen.BATTLE,e.screen)
                     events.add("ULT"); lastUlt=e.ultimateCount
                     if(lastUlt>1) {
-                        assertEquals(.0,e.cutinTime,.0); assertTrue(e.cues.isNotEmpty())
+                        assertFalse(e.awaitingCutin); assertTrue(e.cues.isNotEmpty())
                         e.moveX=1.0; e.player.x=100.0; e.heldSkill=2; e.cooldowns[2]=999.0
                         val time=e.elapsed; val x=e.player.x
                         e.update(.02)
@@ -119,6 +119,7 @@ class BossCombatTest {
                         assertEquals(pauseTime,e.elapsed,.0); assertEquals(Screen.BATTLE,e.screen)
                     }
                 }
+                if(e.screen==Screen.CUTIN) e.dismissCutin()
                 if(e.castName!=lastName) {
                     if(e.hazards.any { !it.ultimate && !it.resolved }) events.add(e.castName)
                     lastName=e.castName
@@ -152,7 +153,7 @@ class BossCombatTest {
         assertFalse(e.ultimateUsed); assertEquals(Screen.BATTLE,e.screen)
         e.damageBoss(1.0)
         assertEquals(Screen.CUTIN,e.screen); assertEquals(450.0,e.boss.hp,.0)
-        repeat(61) { e.update(.05) }
+        e.dismissCutin(); e.update(.05)
         assertFalse(e.enraged)
         e.damageBoss(224.0); assertFalse(e.enraged)
         e.damageBoss(1.0); assertTrue(e.enraged)
@@ -190,7 +191,7 @@ class BossCombatTest {
         for(stage in 0..31) {
             val e=arena(stage)
             e.damageBoss(900.0); assertEquals(Screen.CUTIN,e.screen)
-            repeat(61) { e.update(.05) }; e.damageBoss(225.0)
+            e.dismissCutin(); e.update(.05); e.damageBoss(225.0)
             var mixed=false; var normal=false
             repeat(2000) {
                 e.update(.05)

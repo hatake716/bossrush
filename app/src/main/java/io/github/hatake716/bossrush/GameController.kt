@@ -24,6 +24,11 @@ internal class GameController(private val view: GameView): InputManager.InputDev
     private var nav=ControllerMath.Point(0f,0f)
     private var nextNavigation=0L
     private var triggerDown=false
+    private var rightTriggerDown=false
+    private var cutinHatDown=false
+    // Physical edges survive scene changes; held attack buttons cannot dismiss a new cut-in.
+    private val physicalDown=mutableSetOf<Int>()
+    private val consumedUntilUp=mutableSetOf<Int>()
     private val down=linkedSetOf<Int>()
     private val skills=linkedMapOf<Int,Int>()
     val heldSkill get()=skills.values.lastOrNull() ?: -1
@@ -46,19 +51,21 @@ internal class GameController(private val view: GameView): InputManager.InputDev
     }
     private fun mark(eventDeviceId: Int) { active=true; deviceId=eventDeviceId; syncScreen(); view.invalidate() }
     fun touch() { active=false }
-    private fun choices()=view.controllerButtons().filter { it.enabled && it.skill<0 }
+    private fun choices()=view.controllerButtons().filter { (it.enabled || it.upgradeSlot>=0) && it.skill<0 }
     private fun identity(button: UiButton)="${button.label}:${button.rect.left}:${button.rect.top}"
     private fun focus(button: UiButton?) { focusLabel=button?.label; focusKey=button?.let { identity(it) } }
     fun focused(): UiButton? {
         syncScreen()
+        if(view.buttonsScreen!=e.screen) return null
         val choices=choices()
         val current=choices.firstOrNull { identity(it)==focusKey }
+            ?: choices.firstOrNull { e.screen==Screen.REWARD && it.upgradeSlot==0 }
             ?: choices.firstOrNull { it.rect.top>=60 } ?: choices.firstOrNull()
         focus(current)
         return current
     }
     private fun navigate(dx: Float,dy: Float) {
-        if(e.screen in listOf(Screen.BATTLE,Screen.CUTIN)) return
+        if(e.screen in listOf(Screen.BATTLE,Screen.CUTIN,Screen.DEFEAT)) return
         val current=focused() ?: return
         val choices=choices()
         val i=ControllerMath.neighbor(choices.map { ControllerMath.Point(it.rect.centerX(),it.rect.centerY()) },choices.indexOf(current),dx,dy)
@@ -66,7 +73,7 @@ internal class GameController(private val view: GameView): InputManager.InputDev
         view.invalidate()
     }
     private fun confirm() {
-        focused()?.let { it.action(); view.audio.effect("click"); view.invalidate() }
+        focused()?.takeIf { it.enabled }?.let { it.action(); view.audio.effect("click"); view.invalidate() }
     }
     private fun chooseItem(delta: Int) {
         val count=e.run?.inventory?.size ?: 0
@@ -91,14 +98,27 @@ internal class GameController(private val view: GameView): InputManager.InputDev
         KeyEvent.KEYCODE_BUTTON_L1,KeyEvent.KEYCODE_BUTTON_R1,KeyEvent.KEYCODE_BUTTON_L2,KeyEvent.KEYCODE_BUTTON_START,
         KeyEvent.KEYCODE_ESCAPE,KeyEvent.KEYCODE_ENTER,KeyEvent.KEYCODE_DPAD_CENTER)
     fun key(key: Int,event: KeyEvent): Boolean {
-        if(key !in movementKeys && key !in actionKeys && skill(key)<0) return false
+        val gameButton=KeyEvent.isGamepadButton(key) || (key==KeyEvent.KEYCODE_BACK && event.isFromSource(InputDevice.SOURCE_GAMEPAD))
+        if(key !in movementKeys && key !in actionKeys && skill(key)<0 && !gameButton && key!=KeyEvent.KEYCODE_SPACE) return false
         mark(event.deviceId)
         if(event.action==KeyEvent.ACTION_UP) {
+            physicalDown.remove(key); consumedUntilUp.remove(key)
             down.remove(key); skills.remove(key)
             if(key==KeyEvent.KEYCODE_BUTTON_L2) triggerDown=false
             view.refreshControls(); return true
         }
         if(event.action!=KeyEvent.ACTION_DOWN) return false
+        val fresh=physicalDown.add(key) && event.repeatCount==0
+        if(key in consumedUntilUp) return true
+        if(e.screen==Screen.CUTIN || e.screen==Screen.DEFEAT) {
+            if(fresh && e.screen==Screen.CUTIN) {
+                // Some pads report a trigger as both a key and an axis in the same press.
+                if(key==KeyEvent.KEYCODE_BUTTON_L2) triggerDown=true
+                if(key==KeyEvent.KEYCODE_BUTTON_R2) rightTriggerDown=true
+                consumedUntilUp.add(key); e.dismissCutin(); reset()
+            }
+            return true
+        }
         if(key in movementKeys) {
             down.add(key)
             if(e.screen==Screen.BATTLE) view.refreshControls()
@@ -117,7 +137,7 @@ internal class GameController(private val view: GameView): InputManager.InputDev
                 if(e.screen in listOf(Screen.BATTLE,Screen.CUTIN)) e.pause()
                 else if(e.screen==Screen.PAUSED) e.unpause()
             }
-            key==KeyEvent.KEYCODE_ESCAPE -> view.goBack()
+            key==KeyEvent.KEYCODE_ESCAPE || key==KeyEvent.KEYCODE_BACK -> view.goBack()
             e.screen==Screen.BATTLE && skill(key)>=0 -> {
                 skills[key]=skill(key); view.refreshControls(); e.useSkill(skill(key))
             }
@@ -139,6 +159,16 @@ internal class GameController(private val view: GameView): InputManager.InputDev
         fun hatAxis(id: Int): Float = event.getAxisValue(id).let { if(abs(it)>.5f) sign(it) else 0f }
         hat=ControllerMath.Point(hatAxis(MotionEvent.AXIS_HAT_X),hatAxis(MotionEvent.AXIS_HAT_Y))
         val trigger=max(event.getAxisValue(MotionEvent.AXIS_LTRIGGER),event.getAxisValue(MotionEvent.AXIS_BRAKE))
+        val rightTrigger=max(event.getAxisValue(MotionEvent.AXIS_RTRIGGER),event.getAxisValue(MotionEvent.AXIS_GAS))
+        val hatPressed=hat.x!=0f || hat.y!=0f
+        val dismiss=(trigger>.55f && !triggerDown) || (rightTrigger>.55f && !rightTriggerDown) || (hatPressed && !cutinHatDown)
+        rightTriggerDown=if(rightTriggerDown) rightTrigger>=.35f else rightTrigger>.55f
+        cutinHatDown=hatPressed
+        if(e.screen==Screen.CUTIN || e.screen==Screen.DEFEAT) {
+            triggerDown=if(triggerDown) trigger>=.35f else trigger>.55f
+            if(dismiss && e.screen==Screen.CUTIN) { e.dismissCutin(); reset() }
+            return true
+        }
         if(trigger>.55f && !triggerDown) { openItem(); triggerDown=true }
         else if(trigger<.35f && KeyEvent.KEYCODE_BUTTON_L2 !in down) triggerDown=false
         if(e.screen==Screen.BATTLE) view.refreshControls()
@@ -156,7 +186,7 @@ internal class GameController(private val view: GameView): InputManager.InputDev
         syncScreen()
         val count=e.run?.inventory?.size ?: 0
         item=item.coerceIn(0,(count-1).coerceAtLeast(0))
-        if(active && e.screen !in listOf(Screen.BATTLE,Screen.CUTIN) && (nav.x!=0f || nav.y!=0f) && SystemClock.uptimeMillis()>=nextNavigation) {
+        if(active && e.screen !in listOf(Screen.BATTLE,Screen.CUTIN,Screen.DEFEAT) && (nav.x!=0f || nav.y!=0f) && SystemClock.uptimeMillis()>=nextNavigation) {
             navigate(nav.x,nav.y); nextNavigation=SystemClock.uptimeMillis()+150
         }
     }
@@ -166,10 +196,10 @@ internal class GameController(private val view: GameView): InputManager.InputDev
     }
     override fun onInputDeviceRemoved(deviceId: Int) {
         if(this.deviceId==deviceId) {
-            this.deviceId=null; triggerDown=false; reset(); e.pause(); view.invalidate()
+            this.deviceId=null; focusLost(); e.pause(); view.invalidate()
         }
     }
-    fun focusLost() { triggerDown=false; reset() }
+    fun focusLost() { triggerDown=false; rightTriggerDown=false; cutinHatDown=false; physicalDown.clear(); consumedUntilUp.clear(); reset() }
 
     /** Native confirmations retain directional focus and accept standard gamepad A/B. */
     fun prepareDialog(dialog: AlertDialog): AlertDialog {

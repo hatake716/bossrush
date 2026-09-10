@@ -97,7 +97,7 @@ class GameplayTest {
             val screen=read { it.screen }
             if(screen==Screen.REWARD) break
             assertNotEquals("The touch pilot must survive",Screen.GAMEOVER,screen)
-            if(screen==Screen.CUTIN) { if(!cutinSeen) screenshot("cutin"); cutinSeen=true; SystemClock.sleep(100); continue }
+            if(screen==Screen.CUTIN) { if(!cutinSeen) screenshot("cutin"); cutinSeen=true; tap("タップまたはボタンで戦闘へ"); continue }
             data class Target(val dx: Double,val dy: Double,val slot: Int,val hp: Double)
             val target=read { e ->
                 val threats=e.hazards.filter { !it.resolved && it.shape!="knock" && it.delay-it.time<2.5 }
