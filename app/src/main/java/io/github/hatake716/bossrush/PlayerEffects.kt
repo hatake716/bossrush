@@ -35,7 +35,10 @@ class PlayerEffects {
         if((e.buffs["shield"] ?: 0.0)>0) aura(c,PlayerEffectKind.SHIELD,x,y,e.levels[1],time)
         if((e.buffs["focus"] ?: 0.0)>0) aura(c,PlayerEffectKind.FOCUS,x,y,e.levels[2],time)
         if((e.buffs["speed"] ?: 0.0)>0) wind(c,x,y,e.levels[2],time,e.player.facing)
-        if(e.restTime>0) aura(c,PlayerEffectKind.REST,x,y,e.levels[3],time)
+        if((e.buffs["vanish"] ?: 0.0)>0) {
+            wind(c,x,y,e.levels[3],time,e.player.facing,100)
+            stroke(1.0+Skills.progress(e.levels[3]),130,Color.rgb(168,225,222)); ring(c,x,y+3,22.0+12*Skills.progress(e.levels[3]),.4)
+        }
         for(s in e.summons) {
             val t=Skills.progress(s.level); val r=13+9*t
             stroke(1.0+t,110+(t*70).toInt()); ring(c,s.x,s.y+2,r,.42)
@@ -69,6 +72,54 @@ class PlayerEffects {
         val t=e.strength; val u=e.progress; val fade=(1-u).pow(.65); val alpha=(245*fade).toInt()
         val x=e.x; val y=e.y; val r=e.radius
         when(e.kind) {
+            PlayerEffectKind.LIMIT_SLASH -> {
+                val gold=Color.rgb(250,226,147)
+                val length=r*(.4+.6*u)
+                stroke(6.0+5*t,alpha/3,Color.rgb(149,128,74))
+                line(c,x-cos(e.angle)*length,y-sin(e.angle)*length*.7,x+cos(e.angle)*length,y+sin(e.angle)*length*.7)
+                stroke(2.0+3*t,alpha,gold)
+                line(c,x-cos(e.angle)*length,y-sin(e.angle)*length*.7,x+cos(e.angle)*length,y+sin(e.angle)*length*.7)
+                repeat(5+(13*t).roundToInt()) { i ->
+                    val a=e.angle+i*2.39996; val rr=length*(.35+(i%4)*.2)
+                    fill(if(i%2==0) gold else Ink.paper,alpha); square(c,x+cos(a)*rr,y+sin(a)*rr*.7,2+4*t)
+                }
+                stroke(2.0+2*t,alpha,gold); diamond(c,x,y,8+14*t,18+14*t)
+            }
+            PlayerEffectKind.LIMIT_FLARE -> {
+                val gold=Color.rgb(255,221,144); val fire=Color.rgb(199,116,80)
+                fill(fire,(16*fade).toInt()); c.drawRect(0f,0f,600f,334f,p)
+                val count=9+(16*t).roundToInt()
+                repeat(count) { i ->
+                    val xx=25.0+((i*131+e.angle.toInt()*43)%550)
+                    val yy=28.0+((i*73+e.angle.toInt()*29)%275)
+                    val rr=(23+28*t)*(.3+.7*u)
+                    stroke(2.0+3*t,alpha/2,fire); polygon(c,xx,yy,rr*1.5,8,u)
+                    stroke(2.0+2*t,alpha,gold); polygon(c,xx,yy,rr,8,-u)
+                    fill(gold,alpha); diamond(c,xx,yy,rr*.35,rr*1.2*(1-u*.7))
+                    repeat(4) { j ->
+                        val a=j*PI/2+i; fill(Ink.paper,alpha); square(c,xx+cos(a)*rr*1.5,yy+sin(a)*rr*1.5,3+3*t)
+                    }
+                }
+                stroke(2.0+3*t,alpha/2,gold); ring(c,300.0,167.0,65+u*300,.56)
+            }
+            PlayerEffectKind.LIMIT_SUMMON -> {
+                val green=Color.rgb(199,237,163); val rr=r*(.65+.35*u)
+                stroke(2.0+2*t,alpha,green); polygon(c,x,y,rr,5,e.angle,.5)
+                stroke(1.0+2*t,alpha/2,green); ring(c,x,y,rr*1.2,.5)
+                repeat(5+(10*t).roundToInt()) { i ->
+                    val a=i*2.39996; val yy=y+sin(a)*rr*.45-u*(25+20*t)
+                    fill(green,alpha); square(c,x+cos(a)*rr,yy,3+4*t)
+                    stroke(1.0+t,alpha/2,green); line(c,x+cos(a)*rr,yy+12,x+cos(a)*rr,yy)
+                }
+            }
+            PlayerEffectKind.LIMIT_VANISH -> {
+                val mist=Color.rgb(162,224,224); val rr=r*(.6+u*.6)
+                repeat(6+(18*t).roundToInt()) { i ->
+                    val a=i*2.39996+u*2; val distance=rr*(.25+(i%5)*.18)
+                    fill(if(i%2==0) mist else Ink.mid,alpha/2); square(c,x+cos(a)*distance,y-15+sin(a)*distance*.7-u*18,4+6*t)
+                }
+                stroke(1.0+2*t,alpha,mist); polygon(c,x,y-15,rr*.8,6,u)
+            }
             PlayerEffectKind.SWORD,PlayerEffectKind.KNIFE -> {
                 val span=if(e.kind==PlayerEffectKind.SWORD) 125.0 else 78.0
                 val direction=e.angle*180/PI
@@ -153,7 +204,7 @@ class PlayerEffects {
                     val a=i*2.39996+u*.5; val xx=x+cos(a)*expanded; val yy=y+sin(a)*expanded*.6-u*(14+17*t)
                     stroke(1.0+t,alpha)
                     when(e.kind) {
-                        PlayerEffectKind.HEAL,PlayerEffectKind.REST,PlayerEffectKind.SUMMON_RABBIT -> plus(c,xx,yy,2+3*t)
+                        PlayerEffectKind.HEAL,PlayerEffectKind.SUMMON_RABBIT -> plus(c,xx,yy,2+3*t)
                         PlayerEffectKind.SUMMON_GIANT,PlayerEffectKind.SUMMON_HANIWA -> { fill(Ink.paper,alpha); square(c,xx,yy,3+4*t) }
                         else -> diamond(c,xx,yy,2+3*t,5+5*t)
                     }
@@ -177,8 +228,7 @@ class PlayerEffects {
             repeat(3+(7*t).roundToInt()) { i ->
                 val a=i*2.39996+time*.9; val yy=y+sin(a)*r*.4-((time*12+i*8)%30)
                 stroke(1.0+t,165)
-                if(kind==PlayerEffectKind.REST) plus(c,x+cos(a)*r,yy,2+2*t)
-                else diamond(c,x+cos(a)*r,yy,2+2*t,4+5*t)
+                diamond(c,x+cos(a)*r,yy,2+2*t,4+5*t)
             }
         }
     }

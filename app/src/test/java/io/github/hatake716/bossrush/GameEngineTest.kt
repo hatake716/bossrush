@@ -56,12 +56,12 @@ class GameEngineTest {
         e.hurt(40.0,e.player.x,e.player.y+100,true)
         assertEquals(40.0,hp-e.player.hp,.01)
     }
-    @Test fun restLocksMovementAndHealsOnlyAtCompletion() {
-        val e=battle(); e.player.hp=40.0; val x=e.player.x; e.moveX=1.0
-        assertTrue(e.useSkill(3)); tick(e,1.0)
-        assertEquals(x,e.player.x,.01); assertEquals(40.0,e.player.hp,.01); assertFalse(e.useSkill(2))
-        e.nextPattern=1000.0; e.hazards.clear(); tick(e,1.1)
-        assertEquals(80.0,e.player.hp,.01); assertTrue(e.player.x>x)
+    @Test fun fourthSkillNoLongerHealsOrLocksMovement() {
+        val e=battle(); e.player.hp=40.0; e.boss.hp=1e6; e.boss.maxHp=1e6
+        e.nextPattern=1e6; val x=e.player.x; e.moveX=1.0
+        assertTrue(e.useSkill(3)); tick(e,.3)
+        assertTrue(e.player.x>x); assertEquals(40.0,e.player.hp,.01)
+        assertTrue(e.playerFinisherUsed); assertEquals(10,e.playerFinisherHits)
     }
     @Test fun meleeHasRangeWhileBowTravelsToTarget() {
         val e=battle(); assertFalse(e.useSkill(0)); assertTrue(e.useSkill(2))

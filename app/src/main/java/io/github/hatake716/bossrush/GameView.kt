@@ -338,19 +338,23 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         for(s in e.summons) {
             val summonScale=(if(s.kind==0) 1.2 else .85)*(1+.20*Skills.progress(s.level))
             art.sprite(c,when(s.kind) { 0 -> "giant"; 1 -> "rabbit"; else -> "haniwa" },s.x.toFloat(),s.y.toFloat(),summonScale.toFloat())
-            bar(c,s.x.toFloat()-14,s.y.toFloat()+8,28f,5f,s.life,20.0)
+            bar(c,s.x.toFloat()-14,s.y.toFloat()+8,28f,5f,s.life,if(s.finisher) Skills.finisherDuration(e.job,s.level) else 12.0+8*Skills.progress(s.level))
+            if(s.finisher) pixel(c,"V",s.x.toFloat(),s.y.toFloat()-47,1.0f,Ink.paper,true)
         }
         val px=e.player.x.toFloat(); val py=e.player.y.toFloat()
         if((e.buffs["clones"] ?: .0)>0) {
             art.sprite(c,art.heroKey(e.job),px-32,py+7,1.1f,alpha=135)
             art.sprite(c,art.heroKey(e.job),px+32,py+7,1.1f,alpha=135)
         }
-        val alpha=if((e.buffs["invisible"] ?: .0)>0) 85 else if(e.invulnerability>0) 155 else 255
+        val alpha=if(e.isInvisible) 70 else if(e.invulnerability>0) 155 else 255
         art.sprite(c,art.heroKey(e.job),px,py,1.15f,alpha=alpha)
         if((e.buffs["armor"] ?: .0)>0) {
             p.style=Paint.Style.STROKE; p.strokeWidth=2f; c.drawCircle(px,py-15,24f,p); p.style=Paint.Style.FILL
         }
-        if(e.restTime>0) { pixel(c,"REST",px,py-61,1.25f,Ink.light,true); bar(c,px-24,py-48,48f,7f,2-e.restTime,2.0) }
+        if((e.buffs["vanish"] ?: 0.0)>0) {
+            pixel(c,"VANISH",px,py-61,1.05f,Ink.light,true)
+            bar(c,px-24,py-48,48f,5f,e.buffs.getValue("vanish"),10.0)
+        }
         e.projectiles.forEach { playerEffects.projectile(c,it) }
         e.particles.forEach { q ->
             pixel(c,q.text.replace('−','-'),q.x.toFloat()+1,q.y.toFloat()+1,1.7f,Ink.dark,true)
@@ -383,19 +387,21 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             text(c,if(e.job==Job.SUMMONER) "召喚ゲージ  +10/s" else "アクションゲージ  +20/s",671f,181f,12f,Ink.mid)
             bar(c,671f,190f,247f,12f,e.gauge,100.0)
             text(c,"${r.gold} G",671f,229f,17f); pixel(c,"SCORE ${r.score}",768f,218f,1.25f,Ink.mid)
-            val buffNames=mapOf("shield" to "盾","focus" to "魔力","power" to "攻↑","armor" to "守↑","haste" to "速↑","speed" to "気合","invisible" to "無敵","clones" to "三影")
+            val buffNames=mapOf("shield" to "盾","focus" to "魔力","power" to "攻↑","armor" to "守↑","haste" to "速↑","speed" to "気合","invisible" to "無敵","vanish" to "無影","clones" to "三影")
             val active=e.buffs.filter { it.value>0 }.entries.joinToString(" ") { "${buffNames[it.key]}${ceil(it.value).toInt()}s" }
-            text(c,if(active.isEmpty()) (if(e.job==Job.SUMMONER) "仲間 ${e.summons.size}/2" else "足元の小さな丸が当たり判定") else active,671f,260f,12f,Ink.light)
+            text(c,if(active.isEmpty()) (if(e.job==Job.SUMMONER) "通常 ${e.normalSummons}/2 ・ 必殺 ${e.summons.count { it.finisher }}/5" else "足元の小さな丸が当たり判定") else active,671f,260f,12f,Ink.light)
             if(e.fortune) text(c,"黄金の印：報酬 ×3",671f,281f,11f,Ink.mid)
             Skills.all.getValue(e.job).forEachIndexed { i,s ->
                 val x=653f+(i%2)*145; val y=310f+(i/2)*88
-                val ready=e.cooldowns[i]<=0 && e.restTime<=0
+                val ready=if(i==3) e.canUsePlayerFinisher else e.cooldowns[i]<=0
                 val held=e.heldSkill==i
-                rect(c,x,y,138f,77f,if(held) Ink.light else Ink.deep); border(c,x,y,138f,77f,if(ready) Ink.light else Ink.mid)
+                rect(c,x,y,138f,77f,if(held) Ink.light else Ink.deep); border(c,x,y,138f,77f,if(i==3&&ready) Color.rgb(248,222,146) else if(ready) Ink.light else Ink.mid)
                 art.icon(c,s.glyph,x+11,y+12,1.7f,if(held) Ink.dark else Ink.light)
                 pixel(c,"${if(controller.active) listOf("A","B","X","Y")[i]+" / " else ""}LV${e.levels[i]}",x+(if(controller.active) 54 else 92),y+11,1.2f,if(held) Ink.dark else Ink.mid)
                 text(c,if(e.job==Job.SUMMONER&&i==2&&e.summons.any { it.kind==2 }) "はにわで殴る" else s.name,x+69,y+58,if(s.name.length>7) 13f else 15f,if(held) Ink.dark else Ink.light,Paint.Align.CENTER)
-                if(!ready && e.cooldowns[i]>0) {
+                if(i==3) {
+                    text(c,e.finisherStatus,x+80,y+36,11f,if(held) Ink.dark else if(ready) Color.rgb(248,222,146) else Ink.mid,Paint.Align.CENTER)
+                } else if(!ready && e.cooldowns[i]>0) {
                     rect(c,x+3,y+68,(132*e.cooldowns[i]/Skills.cooldown(e.job,i,e.levels[i])).toFloat(),5f,Ink.mid)
                     text(c,"%.1fs".format(java.util.Locale.ROOT,e.cooldowns[i]),x+62,y+28,12f,if(held) Ink.dark else Ink.light)
                 }
@@ -414,7 +420,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             } else text(c,"—",x+45,509f,14f,Ink.mid,Paint.Align.CENTER)
         }
         text(c,if(controller.active) "L1 / R1 選択・L2 アイテム" else "技は長押しで連続使用",795f+extra,502f,12f,Ink.mid,Paint.Align.CENTER)
-        text(c,if(controller.active) "START 一時停止・技は長押し可" else "休むと2秒間移動できません",795f+extra,523f,11f,Ink.mid,Paint.Align.CENTER)
+        text(c,if(controller.active) "Y 必殺技：HP1/3以下・各戦1回" else "必殺技はHP1/3以下・各ボス戦1回",795f+extra,523f,11f,Ink.mid,Paint.Align.CENTER)
     }
     private fun scrim(c: Canvas) { fullRect(c,Color.argb(225,16,29,26)); buttons.clear() }
     private fun cutin(c: Canvas) {
@@ -598,7 +604,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             "01  移動と攻撃" to "戦場の左半分をドラッグして移動。右の技をタップ、長押しで連続使用。攻撃は自動でボスの方向を狙います。足元の丸が当たり判定です。",
             "02  予兆を読む" to "斜線は危険地帯。突進は帯の横へ、飛び込みは着地点の円の外へ。輪・月印・白いルーンは内側へ。吹き飛ばしは中央へ。前後攻撃は切り返します。",
             "03  技と召喚" to "技にはゲージと待機時間が必要。召喚士は回復速度が半分で仲間は2体まで。はにわは正面を守り、再タップすると近接攻撃します。",
-            "04  休むとアイテム" to "休むと2秒間動けず、その後に回復。下のアイテムを選ぶと時間が止まり、効果を確認して使えます。かばんは特殊アイテムを含めて5個まで。",
+            "04  必殺技とアイテム" to "4番目の技はHP1/3以下で各ボス戦1回だけ使える必殺技。ゲージ消費なし。回復には薬草や白ウサギを使います。下のアイテムを選ぶと時間が止まり、効果を確認できます。かばんは5個まで。",
             "05  成長と保存" to "撃破後に技を1つ選択。キャンセル・選び直しができ、次へ進むと確定します。Lv.16が最大。盗賊は特殊品も選択。戦闘前と買い物後に自動保存。",
             "06  高いスコアへ" to "素早く倒し、被ダメージを減らすと高得点。全32体を越えると世界に色が戻ります。物理キー：WASD/矢印で移動、1〜4で技、Escで一時停止。"
         )

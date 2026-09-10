@@ -10,7 +10,8 @@ object SoundEffects {
         "fire" to .32, "ice" to .35, "arrow-hit" to .17, "fire-hit" to .36,
         "ice-hit" to .30, "giant-hit" to .33, "summon-giant" to .55,
         "summon-rabbit" to .48, "summon-haniwa" to .43, "shield" to .32,
-        "focus" to .42, "speed" to .27, "rest" to .42, "hurt" to .25,
+        "focus" to .42, "speed" to .27, "hurt" to .25,
+        "limit-slash" to .42, "limit-flare" to .52, "limit-summon" to .8, "limit-vanish" to .65,
         "coin" to .28, "heal" to .48, "ultimate" to .75, "cast" to .25,
         "buff" to .32, "victory" to .70, "click" to .07
     )
@@ -49,7 +50,14 @@ object SoundEffects {
             "speed" -> tone(550.0,3300.0,.125)*exp(-t*9)*.65
             "hurt" -> tone(115.0,-260.0,.5)*exp(-t*17)*.6+noise*exp(-t*28)*.25
             "coin" -> tone(if(t<.08) 1100.0 else 1650.0)*exp(-t*10)*.60
-            "heal","rest" -> flourish(if(kind=="heal") 660.0 else 330.0)*.5
+            "limit-slash" -> {
+                val step=min(9,(t/.016).toInt()); val local=t-step*.016
+                (noise*.6+bell(900.0+step*85)*.35)*exp(-local*65)*exp(-max(0.0,t-.16)*14)
+            }
+            "limit-flare" -> noise*exp(-t*9)*.58+sin(2*PI*(62*t+3.5*(1-exp(-t*35))))*exp(-t*11)*.35
+            "limit-summon" -> (tone(65.0,140.0,.5)*.55+bell(195.0)*.25+noise*.15)*exp(-t*3)
+            "limit-vanish" -> (noise*.28+bell(1046.5)*.38+tone(1568.0,-1400.0)*.22)*exp(-t*6)
+            "heal" -> flourish(660.0)*.5
             "ultimate" -> (tone(68.0,80.0,.5)*.45+noise*.3)*(1-u)*(.75+.25*sin(t*36))
             "cast" -> tone(240.0,1000.0,.125)*exp(-t*11)*.40
             "buff" -> flourish(550.0)*.45

@@ -103,9 +103,11 @@ class ControllerTest {
         val keys=listOf(KeyEvent.KEYCODE_BUTTON_A,KeyEvent.KEYCODE_BUTTON_B,KeyEvent.KEYCODE_BUTTON_X,KeyEvent.KEYCODE_BUTTON_Y)
         for(job in Job.entries) for(slot in 0..3) {
             fixture(job)
+            if(slot==3) read { it.engine.player.hp=it.engine.player.maxHp/3 }
             event(keys[slot],KeyEvent.ACTION_DOWN)
             assertEquals("$job/$slot",slot,read { it.engine.heldSkill })
-            assertTrue("$job/$slot skill used",read { it.engine.cooldowns[slot] }>0)
+            if(slot==3) assertTrue(read { it.engine.playerFinisherUsed })
+            else assertTrue("$job/$slot skill used",read { it.engine.cooldowns[slot] }>0)
             event(keys[slot],KeyEvent.ACTION_UP)
             assertEquals(-1,read { it.engine.heldSkill })
         }

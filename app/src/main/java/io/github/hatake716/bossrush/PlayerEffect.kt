@@ -2,7 +2,7 @@ package io.github.hatake716.bossrush
 
 import kotlin.math.*
 
-enum class PlayerEffectKind { SWORD, KNIFE, HANIWA, GIANT, ARROW, FIRE, ICE, SHIELD, FOCUS, SPEED, STEAL, SUMMON_GIANT, SUMMON_RABBIT, SUMMON_HANIWA, HEAL, REST }
+enum class PlayerEffectKind { SWORD, KNIFE, HANIWA, GIANT, ARROW, FIRE, ICE, SHIELD, FOCUS, SPEED, STEAL, SUMMON_GIANT, SUMMON_RABBIT, SUMMON_HANIWA, HEAL, LIMIT_SLASH, LIMIT_FLARE, LIMIT_SUMMON, LIMIT_VANISH }
 
 /** A snapshot of one successful action. Drawing an effect never applies damage. */
 data class PlayerEffect(
@@ -11,7 +11,9 @@ data class PlayerEffect(
 ) {
     val strength: Double get()=Skills.progress(level)
     val lifetime: Double get()=when(kind) {
-        PlayerEffectKind.SUMMON_GIANT,PlayerEffectKind.SUMMON_RABBIT,PlayerEffectKind.SUMMON_HANIWA,PlayerEffectKind.HEAL,PlayerEffectKind.REST -> .65+.25*strength
+        PlayerEffectKind.SUMMON_GIANT,PlayerEffectKind.SUMMON_RABBIT,PlayerEffectKind.SUMMON_HANIWA,PlayerEffectKind.HEAL,PlayerEffectKind.LIMIT_SUMMON,PlayerEffectKind.LIMIT_VANISH -> .65+.25*strength
+        PlayerEffectKind.LIMIT_SLASH -> .34+.14*strength
+        PlayerEffectKind.LIMIT_FLARE -> .55+.15*strength
         else -> .30+.18*strength
     }
     val progress: Double get()=(age/lifetime).coerceIn(0.0,1.0)

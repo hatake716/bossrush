@@ -94,19 +94,16 @@ class PlayerGrowthTest {
         }
     }
 
-    @Test fun recoveryEffectUsesRestLevelAndPauseFreezesEffects() {
+    @Test fun finisherEffectsUseFourthSkillLevelAndPauseFreezesThem() {
         for(job in Job.entries) {
             val e=battle(job,16); e.player.hp=10.0; e.useSkill(3); tick(e,.1)
-            val effect=e.playerEffects.single(); val before=effect.age
-            e.pause(); tick(e,1.0); assertEquals(before,effect.age,0.0)
-            e.unpause(); tick(e,1.92)
-            assertEquals(e.player.maxHp,e.player.hp,0.0)
-            assertTrue(e.playerEffects.any { it.kind==PlayerEffectKind.HEAL && it.level==16 })
-            tick(e,1.2); assertTrue(e.playerEffects.isEmpty())
-            e.beginBattle(); assertTrue(e.playerEffects.isEmpty())
+            assertTrue(e.playerEffects.isNotEmpty()); assertTrue(e.playerEffects.all { it.level==16 })
+            val ages=e.playerEffects.map { it.age }
+            e.pause(); tick(e,1.0); assertEquals(ages,e.playerEffects.map { it.age })
+            e.unpause(); tick(e,.2); assertEquals(10.0,e.player.hp,0.0)
+            e.beginBattle(); assertTrue(e.playerEffects.isEmpty()); assertFalse(e.playerFinisherUsed)
         }
     }
-
     @Test fun continuousAttacksCannotAccumulateUnboundedEffectsAndTrialsHaveNone() {
         val e=battle(Job.WARRIOR,16)
         repeat(90) { e.gauge=100.0; e.cooldowns[0]=0.0; e.useSkill(0) }

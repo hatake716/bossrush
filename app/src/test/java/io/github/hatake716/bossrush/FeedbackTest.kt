@@ -11,13 +11,13 @@ class FeedbackTest {
     }
     @Test fun everySuccessfulSkillHasItsOwnAudibleEventAndRejectedActionsStaySilent() {
         val names=mapOf(
-            Job.WARRIOR to listOf("sword","shield","arrow","rest"),
-            Job.MAGE to listOf("fire","ice","focus","rest"),
-            Job.SUMMONER to listOf("summon-giant","summon-rabbit","summon-haniwa","rest"),
-            Job.THIEF to listOf("knife","coin","speed","rest")
+            Job.WARRIOR to listOf("sword","shield","arrow","limit-slash"),
+            Job.MAGE to listOf("fire","ice","focus","limit-flare"),
+            Job.SUMMONER to listOf("summon-giant","summon-rabbit","summon-haniwa","limit-summon"),
+            Job.THIEF to listOf("knife","coin","speed","limit-vanish")
         )
         for(job in Job.entries) for(slot in 0..3) {
-            val e=battle(job); if(slot==3) e.player.hp-=30
+            val e=battle(job); if(slot==3) e.player.hp=e.player.maxHp/3
             assertTrue(e.useSkill(slot)); assertTrue(e.sounds.contains(names.getValue(job)[slot]))
             e.sounds.clear(); assertFalse(e.useSkill(slot)); assertTrue(e.sounds.isEmpty())
         }

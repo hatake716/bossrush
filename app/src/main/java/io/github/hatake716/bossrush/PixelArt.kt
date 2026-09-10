@@ -77,7 +77,10 @@ class PixelArt(assets: android.content.res.AssetManager) {
             "bow" -> { r(3f,2f,2f,12f); r(5f,1f,4f,2f); r(5f,13f,4f,2f); r(9f,3f,2f,10f); r(1f,7f,14f,2f); r(12f,5f,2f,6f) }
             "fire" -> { r(6f,1f,3f,12f); r(3f,6f,9f,7f); r(1f,9f,13f,4f); r(4f,13f,7f,2f); paint.color=Ink.deep; r(6f,9f,3f,5f) }
             "ice" -> { r(7f,1f,2f,14f); r(1f,7f,14f,2f); r(3f,3f,3f,3f); r(10f,3f,3f,3f); r(3f,10f,3f,3f); r(10f,10f,3f,3f) }
-            "rest" -> { r(1f,5f,2f,10f); r(3f,9f,12f,4f); r(13f,8f,2f,7f); r(4f,6f,4f,3f); r(9f,7f,4f,2f) }
+            "limit-sword" -> { for(i in 0..2) { r(2f+i*5,2f+i,2f,10f); r(1f+i*5,11f+i,4f,2f) } }
+            "limit-flare" -> { r(7f,0f,2f,16f); r(0f,7f,16f,2f); r(3f,3f,10f,10f); paint.color=Ink.deep; r(5f,5f,6f,6f); paint.color=color; r(7f,6f,2f,4f) }
+            "limit-giants" -> { for(i in 0..4) { val xx=1f+i*3; val yy=if(i%2==0) 3f else 7f; r(xx,yy,2f,3f); r(xx-1,yy+3,4f,4f); r(xx,yy+7,2f,3f) } }
+            "limit-vanish" -> { r(6f,1f,5f,3f); r(4f,4f,9f,6f); r(2f,10f,13f,3f); r(1f,14f,3f,1f); r(6f,13f,3f,2f); r(12f,14f,3f,1f); paint.color=Ink.deep; r(7f,5f,2f,3f) }
             "potion" -> { r(6f,1f,5f,3f); r(7f,4f,3f,2f); r(4f,6f,9f,8f); r(6f,14f,5f,1f); paint.color=Ink.deep; r(6f,7f,2f,4f) }
             "coin", "steal" -> { r(4f,1f,8f,2f); r(2f,3f,12f,10f); r(4f,13f,8f,2f); paint.color=Ink.deep; r(7f,4f,2f,8f) }
             "hourglass" -> { r(3f,1f,10f,2f); r(3f,13f,10f,2f); r(4f,3f,8f,2f); r(6f,5f,4f,5f); r(4f,10f,8f,3f) }

@@ -13,7 +13,7 @@ data class Run(
     fun copyForTrial() = Run(job, stage, levels.copyOf(), inventory = mutableListOf())
 }
 data class Actor(var x: Double, var y: Double, var hp: Double, var maxHp: Double, var facing: Double = -PI/2)
-data class Summon(val kind: Int, var x: Double, var y: Double, var life: Double, var timer: Double = .1, val level: Int=1)
+data class Summon(val kind: Int, var x: Double, var y: Double, var life: Double, var timer: Double = .1, val level: Int=1, val finisher: Boolean=false, val formation: Int=0)
 data class Projectile(var x: Double, var y: Double, val vx: Double, val vy: Double, val power: Double, val radius: Double, val kind: String, var life: Double = 3.0, val level: Int=1, var distanceLeft: Double=Double.POSITIVE_INFINITY)
 data class IceMark(var x: Double, var y: Double, val power: Double, val radius: Double, var time: Double = .75, val level: Int=1)
 data class Particle(var x: Double, var y: Double, val text: String, var life: Double = .85, val good: Boolean = false)
@@ -83,7 +83,22 @@ class GameEngine(random: Random=Random.Default) {
     var elapsed = 0.0
     var damageTaken = 0.0
     var damageDone = 0.0
-    var restTime = 0.0
+    var playerFinisherUsed = false
+        private set
+    var playerFinisherHits = 0
+        private set
+    private data class FinisherBurst(val job: Job, val level: Int, val power: Double, var left: Int,
+        val interval: Double, var wait: Double=0.0, var carry: Double=0.0)
+    private var finisherBurst: FinisherBurst? = null
+    val playerFinisherActive get() = finisherBurst!=null
+    val canUsePlayerFinisher get() = screen==Screen.BATTLE && !playerFinisherUsed && player.hp>0 && player.hp<=player.maxHp/3
+    val isInvisible get() = (buffs["invisible"] ?: 0.0)>0 || (buffs["vanish"] ?: 0.0)>0
+    val normalSummons get() = summons.count { !it.finisher }
+    val finisherStatus get() = when {
+        playerFinisherUsed -> "使用済み"
+        canUsePlayerFinisher -> "発動可能"
+        else -> "HP1/3以下"
+    }
     var invulnerability = 0.0
     var ultimateUsed = false
     var ultimateCount = 0
@@ -119,7 +134,7 @@ class GameEngine(random: Random=Random.Default) {
     private var trial = false
     private var finalEnding = false
 
-    fun changeScreen(value: Screen) { if(value in listOf(Screen.TITLE,Screen.REWARD,Screen.GAMEOVER,Screen.ENDING)) bossMove=null; screen=value; screenAge=0.0; heldSkill=-1; moveX=0.0; moveY=0.0 }
+    fun changeScreen(value: Screen) { if(value in listOf(Screen.TITLE,Screen.REWARD,Screen.GAMEOVER,Screen.ENDING)) { bossMove=null; finisherBurst=null }; screen=value; screenAge=0.0; heldSkill=-1; moveX=0.0; moveY=0.0 }
     fun newRun() {
         run = Run(selectedJob); resultRecorded=false; finalEnding=false
         pendingUpgrade=-1
@@ -139,7 +154,8 @@ class GameEngine(random: Random=Random.Default) {
         gauge=100.0; cooldowns.fill(0.0); buffs.clear(); summons.clear(); projectiles.clear(); iceMarks.clear()
         hazards.clear(); impacts.clear(); particles.clear(); playerEffects.clear(); cues.clear(); normalCues.clear(); sounds.clear(); director.reset()
         bossMove=null; bossOldX=boss.x; bossOldY=boss.y; nextIdleTarget=0.0
-        elapsed=0.0; damageTaken=0.0; damageDone=0.0; restTime=0.0; invulnerability=0.0
+        elapsed=0.0; damageTaken=0.0; damageDone=0.0; invulnerability=0.0
+        playerFinisherUsed=false; playerFinisherHits=0; finisherBurst=null
         ultimateUsed=false; ultimateCount=0; cutinTime=0.0; patternNumber=0; nextPattern=1.6*BossTiming.SCALE
         message="予兆の外へ移動。技を押して攻撃！"; messageTime=4.0
         pendingUpgrade=-1; lootChosen=false; stolen=false; pendingLoot=null; fortune=false
@@ -175,7 +191,9 @@ class GameEngine(random: Random=Random.Default) {
         (if((buffs["clones"] ?: 0.0)>0) 2.0 else 1.0)
 
     fun useSkill(slot: Int): Boolean {
-        if(screen!=Screen.BATTLE || slot !in 0..3 || restTime>0 || cooldowns[slot]>.001) return false
+        if(screen!=Screen.BATTLE || slot !in 0..3) return false
+        if(slot==3) return usePlayerFinisher()
+        if(cooldowns[slot]>.001) return false
         val skill=Skills.all.getValue(job)[slot]
         val haniwa=job==Job.SUMMONER && slot==2 && summons.any { it.kind==2 }
         val cost=if(haniwa) 10.0 else skill.cost
@@ -185,15 +203,13 @@ class GameEngine(random: Random=Random.Default) {
         if ((job==Job.WARRIOR&&slot==0 || job==Job.THIEF&&slot<2 || haniwa) && d>range+PlayerAttackGeometry.BOSS_RADIUS) {
             notify("もう少しボスに近づこう"); return false
         }
-        if (job==Job.SUMMONER && slot<3 && !haniwa && summons.size>=2) {
+        if (job==Job.SUMMONER && slot<3 && !haniwa && normalSummons>=2) {
             notify("召喚は2体まで。仲間が帰るのを待とう"); return false
         }
         if (job==Job.THIEF && slot==1 && (stolen || (run?.inventory?.size ?: 5)>=5)) {
             notify(if(stolen) "このボスからは盗み済み" else "アイテムが満杯。使ってから盗もう"); return false
         }
-        if (slot==3 && player.hp>=player.maxHp) { notify("HPは満タン"); return false }
         gauge-=cost; cooldowns[slot]=Skills.cooldown(job,slot,levels[slot])
-        if(slot==3) { restTime=2.0; effect(PlayerEffectKind.REST,player.x,player.y,Skills.auraRadius(levels[3]),levels[3]); sounds.add("rest"); return true }
         player.facing=atan2(boss.y-player.y,boss.x-player.x)
         when(job) {
             Job.WARRIOR -> when(slot) {
@@ -224,6 +240,65 @@ class GameEngine(random: Random=Random.Default) {
         }
         return true
     }
+    private fun usePlayerFinisher(): Boolean {
+        if(!canUsePlayerFinisher) {
+            // A held button must not overwrite other messages every frame after activation.
+            if(!playerFinisherUsed) notify("必殺技はHP1/3以下で発動可能")
+            return false
+        }
+        playerFinisherUsed=true
+        val level=levels[3]
+        notify("${Skills.all.getValue(job)[3].name}！")
+        when(job) {
+            Job.WARRIOR,Job.MAGE -> {
+                finisherBurst=FinisherBurst(job,level,power(3),if(job==Job.WARRIOR) 10 else 5,if(job==Job.WARRIOR) .016 else .24)
+                advancePlayerFinisher(0.0)
+            }
+            Job.SUMMONER -> {
+                repeat(5) { i ->
+                    val a=-PI/2+i*2*PI/5
+                    val summon=Summon(0,(player.x+cos(a)*48).coerceIn(20.0,580.0),(player.y+sin(a)*36).coerceIn(25.0,315.0),
+                        Skills.finisherDuration(job,level),timer=.25+i*.07,level=level,finisher=true,formation=i)
+                    summons.add(summon)
+                    effect(PlayerEffectKind.LIMIT_SUMMON,summon.x,summon.y,Skills.auraRadius(level)*1.45,level,a)
+                }
+                sounds.add("limit-summon")
+            }
+            Job.THIEF -> {
+                buffs["vanish"]=10.0
+                effect(PlayerEffectKind.LIMIT_VANISH,player.x,player.y,Skills.auraRadius(level)*1.7,level)
+                sounds.add("limit-vanish")
+            }
+        }
+        return true
+    }
+    private fun advancePlayerFinisher(dt: Double) {
+        val burst=finisherBurst ?: return
+        burst.wait-=dt
+        while(screen==Screen.BATTLE && (burst.carry>0 || burst.left>0 && burst.wait<=.000001)) {
+            val carried=burst.carry>0
+            val amount=if(carried) burst.carry else burst.power
+            burst.carry=0.0
+            if(!carried) {
+                burst.left--; playerFinisherHits++
+                burst.wait+=burst.interval
+                if(burst.job==Job.WARRIOR) {
+                    effect(PlayerEffectKind.LIMIT_SLASH,boss.x,boss.y,70.0+35*Skills.progress(burst.level),burst.level,
+                        playerFinisherHits*2.39996)
+                    // One SE contains the full ten-cut rhythm; it cannot exhaust the voice limit.
+                    if(playerFinisherHits==1) sounds.add("limit-slash")
+                } else {
+                    effect(PlayerEffectKind.LIMIT_FLARE,300.0,167.0,340.0,burst.level,playerFinisherHits.toDouble())
+                    sounds.add("limit-flare")
+                }
+            }
+            val applied=damageBoss(amount)
+            // Keep the unspent part of a hit through the boss's mandatory half-HP cut-in.
+            if(screen==Screen.CUTIN && amount>applied) burst.carry=amount-applied
+            if(screen!=Screen.BATTLE) return
+        }
+        if(burst.left==0 && burst.carry<=0) finisherBurst=null
+    }
     private fun effect(kind: PlayerEffectKind,x: Double,y: Double,radius: Double,level: Int,angle: Double=0.0) {
         if(trial) return
         if(playerEffects.size>=PlayerEffect.LIMIT) playerEffects.removeAt(0)
@@ -238,17 +313,18 @@ class GameEngine(random: Random=Random.Default) {
         projectiles.add(Projectile(player.x,player.y,cos(a)*speed,sin(a)*speed,power,radius,kind,level=levels[slot],distanceLeft=distance))
         if(!trial) sounds.add(kind)
     }
-    fun damageBoss(amount: Double) {
-        if(screen!=Screen.BATTLE) return
+    fun damageBoss(amount: Double): Double {
+        if(screen!=Screen.BATTLE) return 0.0
         val applied=if(!trial && !ultimateUsed && boss.hp-amount<=boss.maxHp/2) max(0.0,boss.hp-boss.maxHp/2) else min(boss.hp,amount)
         val wasEnraged=enraged
         boss.hp=max(0.0,boss.hp-applied); damageDone+=applied
         if(!trial && !wasEnraged && enraged) notify("HP1/4：二重詠唱！ 重なる予兆の隙間へ")
         if(!trial && applied>0) particles.add(Particle(boss.x+sin(elapsed*7)*25,boss.y-30,"${applied.roundToInt()}"))
-        if(trial) return
+        if(trial) return applied
         if(!ultimateUsed && boss.hp<=boss.maxHp/2+.001) {
             startUltimate()
         } else if(boss.hp<=0.0) victory()
+        return applied
     }
     private fun startUltimate() {
         ultimateUsed=true; ultimateCount++; director.ultimateStarted(); bossMove=null
@@ -270,7 +346,7 @@ class GameEngine(random: Random=Random.Default) {
         if(actual>.1) effect(PlayerEffectKind.HEAL,player.x,player.y,Skills.auraRadius(level),level)
     }
     fun hurt(amount: Double, sourceX: Double=boss.x, sourceY: Double=boss.y, frontal: Boolean=false) {
-        if(invulnerability>0 || (buffs["invisible"] ?: 0.0)>0 || screen!=Screen.BATTLE) return
+        if(invulnerability>0 || isInvisible || screen!=Screen.BATTLE) return
         var reduction=if((buffs["armor"] ?: 0.0)>0) .5 else 1.0
         if((buffs["shield"] ?: 0.0)>0) reduction*=1-.75*Skills.fraction(levels[1])
         val haniwa=summons.firstOrNull { it.kind==2 }
@@ -330,10 +406,9 @@ class GameEngine(random: Random=Random.Default) {
         if(!trial) { hazards.forEach { it.time+=dt }; advanceBoss(dt) }
         elapsed+=dt; messageTime=max(0.0,messageTime-dt); invulnerability=max(0.0,invulnerability-dt)
         for(i in cooldowns.indices) cooldowns[i]=max(0.0,cooldowns[i]-dt)
-        buffs.keys.toList().forEach { buffs[it]=max(0.0,buffs.getValue(it)-dt) }
+        buffs.keys.toList().forEach { buffs[it]=(buffs.getValue(it)-dt).let { remaining -> if(remaining<1e-9) 0.0 else remaining } }
         gauge=min(100.0,gauge+dt*(if(job==Job.SUMMONER) 10.0 else 20.0))
-        if(restTime>0) { restTime-=dt; if(restTime<=0) heal(Skills.power(job,3,levels[3]),levels[3]) }
-        else {
+        run {
             val len=hypot(moveX,moveY).coerceAtLeast(1.0)
             val speed=job.speed*(if((buffs["speed"] ?: 0.0)>0) 1+.8*Skills.fraction(levels[2]) else 1.0)*(if((buffs["haste"] ?: 0.0)>0) 1.5 else 1.0)
             player.x=(player.x+moveX/len*speed*dt).coerceIn(16.0,584.0)
@@ -342,17 +417,21 @@ class GameEngine(random: Random=Random.Default) {
             if(heldSkill>=0) useSkill(heldSkill)
         }
         if(screen!=Screen.BATTLE) return
+        advancePlayerFinisher(dt)
+        if(screen!=Screen.BATTLE) return
         for(s in summons.toList()) {
             s.life-=dt; s.timer-=dt
+            if(s.life<=0) continue
             val angle=atan2(boss.y-player.y,boss.x-player.x)
-            val tx=when(s.kind) { 0 -> boss.x+(if(summons.indexOf(s)%2==0) -36 else 36); 2 -> player.x+cos(angle)*24; else -> player.x-27 }
-            val ty=when(s.kind) { 0 -> boss.y+25; 2 -> player.y+sin(angle)*24; else -> player.y+18 }
+            val formationAngle=PI/2+s.formation*2*PI/5
+            val tx=when(s.kind) { 0 -> if(s.finisher) boss.x+cos(formationAngle)*48 else boss.x+(if(summons.indexOf(s)%2==0) -36 else 36); 2 -> player.x+cos(angle)*24; else -> player.x-27 }
+            val ty=when(s.kind) { 0 -> if(s.finisher) boss.y+sin(formationAngle)*36 else boss.y+25; 2 -> player.y+sin(angle)*24; else -> player.y+18 }
             s.x+=(tx-s.x)*min(1.0,dt*6); s.y+=(ty-s.y)*min(1.0,dt*6)
             if(s.timer<=0) {
                 s.timer+=if(s.kind==1) 2.0 else 1.0
-                if(s.kind==0 && hypot(s.x-boss.x,s.y-boss.y)<Skills.range(job,0,s.level)+PlayerAttackGeometry.BOSS_RADIUS) {
-                    damageBoss(power(0))
-                    effect(PlayerEffectKind.GIANT,s.x,s.y,Skills.range(job,0,s.level),s.level,atan2(boss.y-s.y,boss.x-s.x))
+                if(s.kind==0 && hypot(s.x-boss.x,s.y-boss.y)<Skills.range(job,if(s.finisher) 3 else 0,s.level)+PlayerAttackGeometry.BOSS_RADIUS) {
+                    damageBoss(if(s.finisher) power(3) else power(0))
+                    effect(PlayerEffectKind.GIANT,s.x,s.y,Skills.range(job,if(s.finisher) 3 else 0,s.level),s.level,atan2(boss.y-s.y,boss.x-s.x))
                     if(!trial) sounds.add("giant-hit")
                 }
                 if(s.kind==1 && hypot(s.x-player.x,s.y-player.y)<=Skills.range(job,1,s.level)) heal(Skills.power(job,1,s.level),s.level)
@@ -432,6 +511,7 @@ class GameEngine(random: Random=Random.Default) {
                 if(impacts.size>=24) impacts.removeAt(0)
                 impacts.add(BattleImpact(h.copy()))
                 if(h.contains(player.x,player.y)) {
+                    if(h.shape=="knock" && (buffs["vanish"] ?: 0.0)>0) continue
                     if(h.shape=="knock") {
                         val angle=atan2(player.y-h.y,player.x-h.x)
                         val nx=player.x+cos(angle)*h.a; val ny=player.y+sin(angle)*h.a
