@@ -40,6 +40,12 @@ FF14のレイドバトルに着想を得た、独自のゲーム・キャラク�
 
 ボス撃破時は約1.8秒の爆散演出を表示します。ボス本体のドット絵が48片に砕け、ボス固有色の閃光・二重の衝撃波・火花が広がり、画面の揺れが徐々に収まって強化画面へ進みます。演出中は追加ダメージや操作を受け付けず、スコアの時間は撃破時点で確定します。[操作・撃破演出の変更と検証](docs/BATTLE_PRESENTATION.md)。
 
+## 神々の弾幕攻撃
+
+1.0.21から、全32体のボスが通常技に続けて専用の弾幕を発射します。木の実・羽・氷の矢・毒・炎・剣・雷鎚など16種類のドット絵の弾が、扇・輪・螺旋・左右対・波・十字・花・矢列の軌道で飛びます。発射の光と点線を見て弾の間へ移動しましょう。床の予兆が解決してから発射するため、弾幕中は飛ぶ弾に集中できます。後半ほど弾数・連射数・速度が増えます。
+
+弾本体に接触すると被弾し、残像には当たり判定がありません。盾・防御アイテム・無敵・はにわの身代わりに対応し、ハードモードの攻撃力3倍も適用します。ポーズでは弾も止まり、必殺技への切り替え・ボス撃破・戦闘の終了時に消えます。[全32体の弾幕と検証記録](docs/BARRAGE.md)。
+
 ## クリア後のハードモード
 
 1.0.20から、**通常モードを一周クリアするとタイトル背景がカラーになり、「ハードモード」が解放**されます。解放はアプリ終了後も保持し、以前の版でクリア済みの端末にも適用します。「はじめから」は通常モード、「ハードモード」は新しいハードの冒険を開始します。「つづきから」は保存した難易度で再開します。
@@ -215,12 +221,14 @@ cd bossrush
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
 ```
 
-インストール用の開発APK：`app/build/outputs/apk/debug/app-debug.apk`。これはデバッグ署名の動作確認用ビルドです。Google Play向けのアップロード鍵や本番の署名鍵は本リポジトリに作成・登録していません。
+エミュレーター用の開発APK：`app/build/outputs/apk/debug/app-debug.apk`。これはデバッグ署名の動作確認用ビルドです。リリース用のアップロード鍵はGit管理外の `keystore.properties` で指定します（[署名とPlay向け成果物](play/README.md)）。
 
 ```sh
 adb -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk
 adb -s emulator-5554 shell am start -n io.github.hatake716.bossrush/.MainActivity
 ```
+
+Google Play版が入った実機には、`./gradlew assemblePreview` で生成した `app/build/outputs/apk/preview/app-preview.apk` を追加できます。アプリ名は **BOSSRUSH 開発版**、パッケージは `io.github.hatake716.bossrush.preview`。配信版とはセーブ・スコアを別に保持します。アップロード鍵の設定があればその鍵、なければデバッグ鍵で署名します。Google Play版と手元のAPKは署名が異なるため、この開発版を並べてインストールして動作確認します。
 
 エミュレーターの操作テストは `tools/test-emulator.sh emulator-5554`。物理端末の操作を防ぐため、スクリプトとテスト内でエミュレーターであることを確認します。テストは本アプリのエミュレーター内の保存データを初期化します。
 
@@ -237,6 +245,7 @@ adb -s emulator-5554 shell am start -n io.github.hatake716.bossrush/.MainActivit
 - `app/src/main/assets/sprites`：4職業・32ボス・3召喚獣の専用画像。
 - `BossMovement.kt`：32体の突進・跳躍・回り込み・瞬間移動、予兆に連動する経路と接触判定。
 - `BossCombat.kt`：66種類の専用通常攻撃、難易度の段階調整、覚醒後のランダムな攻撃選択。
+- `EnemyBarrage.kt` / `EnemyBulletArt.kt`：32体の遠隔弾幕、発射予告、軌道、16種類の弾のドット描画。
 - `UltimateColors.kt`：32体の必殺技に使う鮮やかな配色。
 - `GameViewport.kt`：画面幅とカメラ穴に応じた配置、描画と入力の座標変換。
 - `GameView.kt`：描画、同時タッチ、入力表示、仮想アクセシビリティボタン。

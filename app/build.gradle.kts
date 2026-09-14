@@ -21,8 +21,8 @@ android {
         applicationId = "io.github.hatake716.bossrush"
         minSdk = 26
         targetSdk = 36
-        versionCode = 21
-        versionName = "1.0.20"
+        versionCode = 22
+        versionName = "1.0.21"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     androidResources { noCompress += "ogg" }
@@ -40,6 +40,14 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             if (hasSigningConfig) signingConfig = signingConfigs.getByName("release")
+        }
+        create("preview") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".preview"
+            versionNameSuffix = "-preview"
+            matchingFallbacks += "release"
+            // Install alongside Google Play's independently signed production app.
+            signingConfig = signingConfigs.getByName(if (hasSigningConfig) "release" else "debug")
         }
     }
     compileOptions {

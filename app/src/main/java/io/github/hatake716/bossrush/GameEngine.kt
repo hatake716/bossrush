@@ -68,6 +68,9 @@ class GameEngine(random: Random=Random.Default) {
     val buffs = mutableMapOf<String,Double>()
     val summons = mutableListOf<Summon>()
     val projectiles = mutableListOf<Projectile>()
+    val enemyBullets = mutableListOf<EnemyBullet>()
+    var enemyVolley: EnemyVolley?=null
+        private set
     val iceMarks = mutableListOf<IceMark>()
     val hazards = mutableListOf<Hazard>()
     val impacts = mutableListOf<BattleImpact>()
@@ -141,9 +144,10 @@ class GameEngine(random: Random=Random.Default) {
     private var trial = false
     private var finalEnding = false
 
-    fun changeScreen(value: Screen) { if(value in listOf(Screen.TITLE,Screen.DEFEAT,Screen.REWARD,Screen.GAMEOVER,Screen.ENDING)) { bossMove=null; finisherBurst=null }; screen=value; screenAge=0.0; heldSkill=-1; moveX=0.0; moveY=0.0 }
+    fun changeScreen(value: Screen) { if(value in listOf(Screen.TITLE,Screen.DEFEAT,Screen.REWARD,Screen.GAMEOVER,Screen.ENDING)) { bossMove=null; finisherBurst=null; clearEnemyFire() }; screen=value; screenAge=0.0; heldSkill=-1; moveX=0.0; moveY=0.0 }
     // The UI opts into the campaign. Combat simulations and existing fixtures stay independent.
     fun newRun(story: Boolean = false) {
+        clearEnemyFire()
         run = Run(selectedJob,storyEnabled=story,mode=selectedMode); resultRecorded=false; finalEnding=false
         pendingUpgrade=-1
         if(story) showStory(StoryMoment.PROLOGUE)
@@ -210,6 +214,7 @@ class GameEngine(random: Random=Random.Default) {
         player=Actor(300.0,265.0,job.hp,job.hp)
         boss=Actor(300.0,125.0,1e12,1e12)
         gauge=100.0; cooldowns.fill(0.0); buffs.clear(); summons.clear(); projectiles.clear(); iceMarks.clear()
+        clearEnemyFire()
         hazards.clear(); impacts.clear(); particles.clear(); playerEffects.clear(); cues.clear(); normalCues.clear(); sounds.clear(); director.reset()
         bossMove=null; bossOldX=boss.x; bossOldY=boss.y; nextIdleTarget=0.0
         elapsed=0.0; damageTaken=0.0; damageDone=0.0; invulnerability=0.0
@@ -386,6 +391,7 @@ class GameEngine(random: Random=Random.Default) {
     }
     private fun startUltimate() {
         ultimateUsed=true; ultimateCount++; director.ultimateStarted(); bossMove=null
+        clearEnemyFire()
         hazards.clear(); impacts.clear(); cues.clear(); normalCues.clear()
         castName=bossInfo.ultimate; castHint=bossInfo.hint; sounds.add("ultimate")
         if(ultimateCount==1) {
@@ -551,7 +557,7 @@ class GameEngine(random: Random=Random.Default) {
         val normalDue=normalCues.filter { it.at<=elapsed }
         normalCues.removeAll(normalDue.toSet())
         normalDue.forEach { castNormalWave(it) }
-        if(elapsed>=nextPattern && cues.isEmpty() && normalCues.isEmpty() && hazards.none { !it.resolved }) {
+        if(elapsed>=nextPattern && cues.isEmpty() && normalCues.isEmpty() && hazards.none { !it.resolved } && enemyVolley==null && enemyBullets.isEmpty()) {
             val i=director.next(BossCombat.forBoss(bossInfo.id).size,ultimateUsed,BossDifficulty(run!!.stage).ultimateChance)
             if(i<0) { startUltimate(); return }
             castNormal(i,patternNumber++)
@@ -588,6 +594,56 @@ class GameEngine(random: Random=Random.Default) {
             }
         }
         hazards.removeAll { it.time>=it.delay+it.duration }
+        if(screen!=Screen.BATTLE) return
+        advanceEnemyFire(dt,playerOldX,playerOldY)
+    }
+    private fun clearEnemyFire() { enemyBullets.clear(); enemyVolley=null }
+
+    private fun advanceEnemyFire(dt: Double,playerOldX: Double,playerOldY: Double) {
+        // Substeps follow curved paths; relative swept contact also catches a player
+        // crossing a bullet between frames. Only the visible core deals damage.
+        val iterator=enemyBullets.iterator()
+        while(iterator.hasNext()) {
+            val b=iterator.next(); val steps=max(1,ceil(dt/.01).toInt()); val step=dt/steps
+            var hit=false
+            for(i in 0 until steps) {
+                if(b.life<=0) break
+                val ox=b.x; val oy=b.y; val active=min(step,b.life); val startAge=b.age
+                val angle=b.heading+b.turn*(b.age+active/2)+b.weave*sin((b.age+active/2)*5+b.phase)
+                b.x+=cos(angle)*b.speed*active; b.y+=sin(angle)*b.speed*active; b.age+=active; b.life-=active
+                val fraction=if(step>0) active/step else 0.0
+                val from=i.toDouble()/steps; val to=(i+fraction)/steps
+                val arm=if(active>0) ((EnemyBullet.ARM_TIME-startAge)/active).coerceIn(0.0,1.0) else 1.0
+                if(b.armed && arm<1) {
+                    val px0=playerOldX+(player.x-playerOldX)*(from+(to-from)*arm)
+                    val py0=playerOldY+(player.y-playerOldY)*(from+(to-from)*arm)
+                    val px1=playerOldX+(player.x-playerOldX)*to; val py1=playerOldY+(player.y-playerOldY)*to
+                    hit=PlayerAttackGeometry.contactFraction(ox+(b.x-ox)*arm-px0,oy+(b.y-oy)*arm-py0,b.x-px1,b.y-py1,b.radius+7)!=null
+                    if(hit) break
+                }
+            }
+            if(hit || b.life<=0 || b.x< -24 || b.x>624 || b.y< -24 || b.y>358) iterator.remove()
+            if(hit) {
+                hurt(bossDamage()*b.power)
+                // Game over clears the whole collection, invalidating this iterator.
+                if(screen!=Screen.BATTLE) return
+            }
+        }
+        val volley=enemyVolley ?: return
+        if(elapsed<volley.readyAt) return
+        if(!volley.started) {
+            volley.started=true; volley.x=boss.x; volley.y=boss.y
+            val tx=if(volley.profile.remembers) volley.memoryX else player.x
+            val ty=if(volley.profile.remembers) volley.memoryY else player.y
+            volley.aim=atan2(ty-boss.y,tx-boss.x)
+            castName="弾幕：${volley.profile.name}"; castHint=volley.profile.hint
+            castDuration=volley.warning; castEnd=volley.firstShot; sounds.add("cast")
+        }
+        while(volley.emitted<volley.profile.waves && elapsed>=volley.firstShot+volley.emitted*volley.profile.rhythm) {
+            enemyBullets.addAll(volley.bullets(volley.emitted).take((EnemyBarrage.MAX_BULLETS-enemyBullets.size).coerceAtLeast(0)))
+            volley.emitted++; sounds.add("enemy-shot")
+        }
+        if(volley.emitted==volley.profile.waves) { enemyVolley=null; nextPattern=max(nextPattern,elapsed+.35) }
     }
     private fun advanceBoss(dt: Double) {
         bossOldX=boss.x; bossOldY=boss.y; bossTeleported=false
@@ -600,7 +656,7 @@ class GameEngine(random: Random=Random.Default) {
             boss.facing=atan2(move.toY-move.fromY,move.toX-move.fromX)
             return
         }
-        if(hazards.any { !it.resolved } || normalCues.isNotEmpty() || cues.isNotEmpty()) return
+        if(hazards.any { !it.resolved } || normalCues.isNotEmpty() || cues.isNotEmpty() || enemyVolley!=null || enemyBullets.isNotEmpty()) return
         val profile=BossMobility.forBoss(bossInfo.id)
         if(elapsed>=nextIdleTarget) {
             val target=BossMobility.target(this,profile.copy(kind=BossMoveKind.FLANK), (elapsed/1.4).toInt())
@@ -660,6 +716,7 @@ class GameEngine(random: Random=Random.Default) {
         castDuration=arena.hazards.maxOf { it.delay }; castEnd=elapsed+castDuration
         val finish=elapsed+arena.hazards.maxOf { it.delay+it.duration }
         if(cue.wave+1<attack.waves) normalCues.add(cue.copy(at=finish+difficulty.comboGap,wave=cue.wave+1))
+        else enemyVolley=EnemyVolley(EnemyBarrage.forBoss(bossInfo.id),run!!.stage,finish+.12,cue.ordinal,cue.memoryX,cue.memoryY)
         nextPattern=finish+difficulty.recovery
         sounds.add("cast")
     }

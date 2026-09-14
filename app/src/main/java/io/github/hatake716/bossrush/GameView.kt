@@ -32,6 +32,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
     private val art=PixelArt(context.assets)
     private val backgrounds=BackgroundArt(context.assets)
     private val battleEffects=BattleEffects()
+    private val enemyBulletArt=EnemyBulletArt()
     private val playerEffects=PlayerEffects()
     private val defeatEffects=BossDefeatEffects()
     internal val storyText=StoryText(context.assets)
@@ -413,6 +414,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             text(c,"通常：${b.attackNames.joinToString(" / ")}",431f,386f,13f,Ink.mid)
             text(c,"HP1/2で覚醒。1/4以下は二重詠唱！",431f,407f,12f,Ink.mid)
             text(c,"全回復して挑戦  /  アイテム ${engine.run!!.inventory.size}/5",431f,424f,15f)
+            text(c,"弾幕：${EnemyBarrage.forBoss(b.id).name}",431f,445f,12f,Ink.mid)
             button(c,"戦闘開始  →",665f,454f,259f,51f,true) { engine.beginBattle() }
         }
     }
@@ -463,6 +465,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         p.color=Ink.light; p.style=Paint.Style.STROKE; p.strokeWidth=1f
         c.drawOval(e.boss.x.toFloat()-34,e.boss.y.toFloat()-9,e.boss.x.toFloat()+34,e.boss.y.toFloat()+17,p)
         p.style=Paint.Style.FILL
+        enemyBulletArt.draw(c,e)
         for(s in e.summons) {
             val summonScale=(if(s.kind==0) 1.2 else .85)*(1+.20*Skills.progress(s.level))
             art.sprite(c,when(s.kind) { 0 -> "giant"; 1 -> "rabbit"; else -> "haniwa" },s.x.toFloat(),s.y.toFloat(),summonScale.toFloat())
@@ -733,7 +736,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             "06  安心して再開" to "操作中のコントローラーが切断されると戦闘を一時停止します。再接続してSTARTで再開。タッチ操作にもいつでも切り替えられます。"
         ) else listOf(
             "01  移動と攻撃" to "戦場の左半分をドラッグして移動。右の技をタップ、長押しで連続使用。攻撃は自動でボスの方向を狙います。足元の丸が当たり判定です。",
-            "02  予兆を読む" to "斜線は危険地帯。突進は帯の横へ、飛び込みは着地点の円の外へ。カットインはタップかボタンで閉じるまで時間が止まります。輪・月印・白いルーンは内側へ。",
+            "02  予兆と弾幕" to "斜線は危険地帯。突進は帯の横へ、飛び込みは円の外へ。弾幕は発射の光を見て弾の間へ。弾本体に触れると被弾。カットインは入力で閉じ、輪・月印・白いルーンは内側へ。",
             "03  技と召喚" to "技にはゲージと待機時間が必要。召喚士は回復速度が半分で仲間は2体まで。はにわは成長で耐久1〜4回・5〜20秒。再タップで近接攻撃。白ウサギの回復は8〜16。",
             "04  必殺技とアイテム" to "4番目の技はHP1/3以下で各ボス戦1回だけ使える必殺技。ゲージ消費なし。回復には薬草や白ウサギを使います。下のアイテムを選ぶと時間が止まり、効果を確認できます。かばんは5個まで。",
             "05  成長と物語" to "撃破後に技を選び、次へ進むと確定。Lv.16が最大。盗賊は特殊品も選択。物語は前後のページへ移動・スキップが可能。ページごと、戦闘前、買い物後に自動保存。",

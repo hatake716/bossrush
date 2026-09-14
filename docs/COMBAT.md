@@ -173,3 +173,7 @@ HPが最大値の25%以下になると、次の予兆から通常技の各段に
 画像はAndroidのゲーム描画処理へテスト用の状態を設定して撮影しています。32連戦を人が通して遊んだ記録ではありません。検証結果と実機への反映は [VALIDATION.md](VALIDATION.md) に記録します。
 
 二重詠唱の描画例：[トール](screenshots/double-cast-thor.png)、[オーディン](screenshots/double-cast-odin.png)。[カットイン前半16体](screenshots/mythic-cutins-1.png)、[後半16体](screenshots/mythic-cutins-2.png)。いずれも描画検証用の状態です。
+
+## 1.0.21の弾幕攻撃
+
+通常技の連続予兆がすべて解決した後に、ボスごとの弾幕を追加します。発射前に0.55〜0.75秒の光と発射方向の点線を表示し、弾が消えるまで次の床攻撃を待ちます。[32体の弾幕・接触判定・保存と検証](BARRAGE.md)を参照してください。
