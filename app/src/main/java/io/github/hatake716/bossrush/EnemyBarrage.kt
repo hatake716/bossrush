@@ -10,33 +10,42 @@ data class BarrageProfile(val name: String,val hint: String,val shape: BulletSha
 
 data class EnemyBullet(var x: Double,var y: Double,val heading: Double,val speed: Double,val radius: Double,
     val shape: BulletShape,val power: Double,val turn: Double=0.0,val weave: Double=0.0,val phase: Double=0.0,
-    var age: Double=0.0,var life: Double=3.6) {
-    val angle get()=heading+turn*age+weave*sin(age*5+phase)
+    var age: Double=0.0,var life: Double=3.6*BossTiming.INTERVAL_SCALE) {
+    fun angleAt(time: Double)=heading+turn*time+weave*sin(time*5*BossTiming.RATE+phase)
+    val angle get()=angleAt(age)
     val armed get()=age>=ARM_TIME
-    companion object { const val ARM_TIME=.20 }
+    companion object { const val ARM_TIME=.20*BossTiming.INTERVAL_SCALE }
 }
 
 /** Target and emitter are fixed during the visible charge; fired bullets never home. */
 data class EnemyVolley(val profile: BarrageProfile,val stage: Int,val readyAt: Double,val ordinal: Int,
     val memoryX: Double,val memoryY: Double,var started: Boolean=false,var x: Double=0.0,var y: Double=0.0,
     var aim: Double=0.0,var emitted: Int=0) {
-    val warning get()=.75-.20*stage.coerceIn(0,31)/31.0
+    val warning get()=(.75-.20*stage.coerceIn(0,31)/31.0)*BossTiming.INTERVAL_SCALE
     val firstShot get()=readyAt+warning
-    val speed get()=68.0+40.0*stage.coerceIn(0,31)/31.0
+    val speed get()=(68.0+40.0*stage.coerceIn(0,31)/31.0)*BossTiming.RATE
+    val interval get()=profile.rhythm*BossTiming.INTERVAL_SCALE
+    // Preserve the authored number of waves so higher density does not slow the cycle.
+    val count: Int get() {
+        val density=when { stage<8 -> 1.35; stage<20 -> 1.45; else -> 1.55 }
+        val group=when(profile.pattern) { BarragePattern.CROSS -> 4; BarragePattern.PAIRS -> 2; else -> 1 }
+        return ceil(profile.count*density/group).toInt()*group
+    }
     val power get()=.55+.15*stage.coerceIn(0,31)/31.0
     val side get()=if(ordinal%2==0) 1 else -1
     fun bullets(wave: Int): List<EnemyBullet> {
-        val p=profile; val center=aim+p.rotation*wave*side
-        return (0 until p.count).map { i ->
-            val u=if(p.count>1) i.toDouble()/(p.count-1)-.5 else .0
+        val p=profile; val n=count
+        val stagger=if(wave%2==1) min(.16,PI/n) else .0
+        val center=aim+(p.rotation*wave+stagger)*side
+        return (0 until n).map { i ->
+            val u=if(n>1) i.toDouble()/(n-1)-.5 else .0
             val angle=when(p.pattern) {
                 BarragePattern.FAN,BarragePattern.STREAM -> center+u*p.spread
-                BarragePattern.RING -> center+2*PI*(i+.5*(wave%2))/p.count
-                BarragePattern.SPIRAL -> center+2*PI*i/p.count
+                BarragePattern.RING,BarragePattern.SPIRAL -> center+2*PI*i/n
                 BarragePattern.PAIRS -> center+(if(i%2==0) -1 else 1)*(.18+(i/2)*p.spread)
                 BarragePattern.WAVE -> center+u*p.spread+.15*sin(i*1.4+wave)
-                BarragePattern.CROSS -> center+(i%4)*PI/2+(i/4-(p.count/4-1)/2.0)*p.spread
-                BarragePattern.FLOWER -> center+2*PI*i/p.count+.12*sin(i*3.0+wave)
+                BarragePattern.CROSS -> center+(i%4)*PI/2+(i/4-(n/4-1)/2.0)*p.spread
+                BarragePattern.FLOWER -> center+2*PI*i/n+.12*sin(i*3.0+wave)
             }
             val offset=if(p.pattern==BarragePattern.STREAM) u*45 else .0
             val speedScale=when(p.pattern) {
@@ -45,16 +54,16 @@ data class EnemyVolley(val profile: BarrageProfile,val stage: Int,val readyAt: D
                 else -> 1.0
             }
             EnemyBullet(x-sin(aim)*offset,y+cos(aim)*offset,angle,speed*speedScale,3.0+(stage/12)*.4,
-                p.shape,power,p.turn*side,p.weave,i*.7)
+                p.shape,power,p.turn*side*BossTiming.RATE,p.weave,i*.7)
         }
     }
 }
 
 /** Individual mythology-inspired volleys, additive to the existing floor and movement attacks. */
 object EnemyBarrage {
-    const val MAX_BULLETS=144
+    const val MAX_BULLETS=192
     val profiles=linkedMapOf(
-        "ratatoskr" to BarrageProfile("枝渡りの木の実","木の実の三方向射撃を横へかわす",BulletShape.SEED,BarragePattern.FAN,3,2,.85,rotation=.16),
+        "ratatoskr" to BarrageProfile("枝渡りの木の実","木の実の扇状射撃を横へかわす",BulletShape.SEED,BarragePattern.FAN,3,2,.85,rotation=.16),
         "dainn" to BarrageProfile("四枝の若葉","四方へ広がる葉の間を抜ける",BulletShape.LEAF,BarragePattern.CROSS,8,2,.30,rotation=.12),
         "gullinbursti" to BarrageProfile("黄金の剛毛","並んで飛ぶ黄金の針から横へ",BulletShape.NEEDLE,BarragePattern.STREAM,4,3,.16,rhythm=.22),
         "hugin" to BarrageProfile("思考の羽矢","開いてゆく羽の扇を見て移動",BulletShape.FEATHER,BarragePattern.FAN,5,3,1.2,rotation=.19),

@@ -249,13 +249,13 @@ class GameEngineTest {
             val delay=e.hazards.minOf { it.delay }; val first=e.hazards.filter { abs(it.delay-delay)<.01 }
             var best=Double.POSITIVE_INFINITY
             for(x in 20..580 step 10) for(y in 20..310 step 10) if(first.none { it.contains(x.toDouble(),y.toDouble(),12.0) }) best=min(best,hypot(x-e.player.x,y-e.player.y))
-            assertTrue("${pattern.name} $pos needs $best distance in $delay",best/e.job.speed+.19<=delay)
+            assertTrue("${pattern.name} $pos needs $best distance in $delay",best/e.job.speed+.15<=delay)
         }
     }
     @Test fun extendedUltimateTelegraphsDoNotOverlapLaterSteps() {
         val e=battle(Job.SUMMONER,29); e.player.x=20.0; e.player.y=20.0
         e.damageBoss(e.boss.maxHp); e.dismissCutin(); tick(e,.1)
         val remaining=e.hazards.maxOf { it.delay-it.time }
-        assertTrue(e.cues.first().at>=e.elapsed+remaining+.25)
+        assertTrue(e.cues.first().at>=e.elapsed+remaining+.20)
     }
 }

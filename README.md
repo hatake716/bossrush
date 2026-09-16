@@ -212,6 +212,8 @@ BGMは44.1 kHzのステレオ音声を同梱し、Androidで復号後に連続�
 
 ## 開発とビルド
 
+**1.0.22：戦闘テンポと弾幕を調整。** 全職業の移動速度、ボスの攻撃頻度と速度を1.25倍にし、全32体の弾数を増やしました。[変更値と検証記録](docs/COMBAT_TUNING_1.0.22.md)、[Google Play更新用の資料](play/README.md)を参照してください。
+
 JDK 17、Android SDK Platform 36とBuild Tools 36.0.0を用意します。
 
 ```sh

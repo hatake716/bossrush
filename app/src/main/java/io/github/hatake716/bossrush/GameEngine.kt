@@ -609,7 +609,7 @@ class GameEngine(random: Random=Random.Default) {
             for(i in 0 until steps) {
                 if(b.life<=0) break
                 val ox=b.x; val oy=b.y; val active=min(step,b.life); val startAge=b.age
-                val angle=b.heading+b.turn*(b.age+active/2)+b.weave*sin((b.age+active/2)*5+b.phase)
+                val angle=b.angleAt(b.age+active/2)
                 b.x+=cos(angle)*b.speed*active; b.y+=sin(angle)*b.speed*active; b.age+=active; b.life-=active
                 val fraction=if(step>0) active/step else 0.0
                 val from=i.toDouble()/steps; val to=(i+fraction)/steps
@@ -639,11 +639,11 @@ class GameEngine(random: Random=Random.Default) {
             castName="弾幕：${volley.profile.name}"; castHint=volley.profile.hint
             castDuration=volley.warning; castEnd=volley.firstShot; sounds.add("cast")
         }
-        while(volley.emitted<volley.profile.waves && elapsed>=volley.firstShot+volley.emitted*volley.profile.rhythm) {
+        while(volley.emitted<volley.profile.waves && elapsed>=volley.firstShot+volley.emitted*volley.interval) {
             enemyBullets.addAll(volley.bullets(volley.emitted).take((EnemyBarrage.MAX_BULLETS-enemyBullets.size).coerceAtLeast(0)))
             volley.emitted++; sounds.add("enemy-shot")
         }
-        if(volley.emitted==volley.profile.waves) { enemyVolley=null; nextPattern=max(nextPattern,elapsed+.35) }
+        if(volley.emitted==volley.profile.waves) { enemyVolley=null; nextPattern=max(nextPattern,elapsed+.35*BossTiming.INTERVAL_SCALE) }
     }
     private fun advanceBoss(dt: Double) {
         bossOldX=boss.x; bossOldY=boss.y; bossTeleported=false
@@ -659,12 +659,12 @@ class GameEngine(random: Random=Random.Default) {
         if(hazards.any { !it.resolved } || normalCues.isNotEmpty() || cues.isNotEmpty() || enemyVolley!=null || enemyBullets.isNotEmpty()) return
         val profile=BossMobility.forBoss(bossInfo.id)
         if(elapsed>=nextIdleTarget) {
-            val target=BossMobility.target(this,profile.copy(kind=BossMoveKind.FLANK), (elapsed/1.4).toInt())
-            idleTargetX=target.first; idleTargetY=target.second; nextIdleTarget=elapsed+1.4
+            val target=BossMobility.target(this,profile.copy(kind=BossMoveKind.FLANK), (elapsed/(1.4*BossTiming.INTERVAL_SCALE)).toInt())
+            idleTargetX=target.first; idleTargetY=target.second; nextIdleTarget=elapsed+1.4*BossTiming.INTERVAL_SCALE
         }
         val dx=idleTargetX-boss.x; val dy=idleTargetY-boss.y; val d=hypot(dx,dy)
         if(d>1) {
-            val step=min(d,dt*(if(profile.kind==BossMoveKind.FLANK) 88 else 64))
+            val step=min(d,dt*BossTiming.RATE*(if(profile.kind==BossMoveKind.FLANK) 88 else 64))
             boss.x+=dx/d*step; boss.y+=dy/d*step; boss.facing=atan2(dy,dx)
         }
     }
@@ -694,7 +694,7 @@ class GameEngine(random: Random=Random.Default) {
                 created[i]=h.copy(x=x,y=y,angle=if(h.shape=="cone") h.angle+aimDelta else h.angle,sourceX=x,sourceY=y)
             }
         }
-        return BossMove(kind,boss.x,boss.y,x,y,created.first(),if(kind==BossMoveKind.BLINK) .26 else profile.tempo)
+        return BossMove(kind,boss.x,boss.y,x,y,created.first(),if(kind==BossMoveKind.BLINK) .26*BossTiming.INTERVAL_SCALE else profile.tempo)
     }
 
     fun bossDamage() = BossDifficulty(run?.stage ?: 0).damage*mode.damageMultiplier
@@ -716,7 +716,7 @@ class GameEngine(random: Random=Random.Default) {
         castDuration=arena.hazards.maxOf { it.delay }; castEnd=elapsed+castDuration
         val finish=elapsed+arena.hazards.maxOf { it.delay+it.duration }
         if(cue.wave+1<attack.waves) normalCues.add(cue.copy(at=finish+difficulty.comboGap,wave=cue.wave+1))
-        else enemyVolley=EnemyVolley(EnemyBarrage.forBoss(bossInfo.id),run!!.stage,finish+.12,cue.ordinal,cue.memoryX,cue.memoryY)
+        else enemyVolley=EnemyVolley(EnemyBarrage.forBoss(bossInfo.id),run!!.stage,finish+.12*BossTiming.INTERVAL_SCALE,cue.ordinal,cue.memoryX,cue.memoryY)
         nextPattern=finish+difficulty.recovery
         sounds.add("cast")
     }

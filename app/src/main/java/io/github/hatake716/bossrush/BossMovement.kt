@@ -12,7 +12,7 @@ data class BossMove(
 ) {
     val start get()=when(kind) {
         BossMoveKind.CHARGE -> anchor.delay
-        BossMoveKind.FLANK,BossMoveKind.BLINK -> (anchor.delay-travel-.10).coerceAtLeast(0.0)
+        BossMoveKind.FLANK,BossMoveKind.BLINK -> (anchor.delay-travel-.10*BossTiming.INTERVAL_SCALE).coerceAtLeast(0.0)
         BossMoveKind.LEAP -> (anchor.delay-travel).coerceAtLeast(0.0)
     }
     val progress get()=((anchor.time-start)/travel).coerceIn(0.0,1.0)
@@ -29,7 +29,7 @@ data class BossMove(
 }
 
 object BossMobility {
-    private fun p(kind: BossMoveKind,slot: Int=0,reach: Double=230.0,width: Double=52.0,range: Double=100.0,tempo: Double=.44)=BossMoveProfile(kind,slot,reach,width,range,tempo)
+    private fun p(kind: BossMoveKind,slot: Int=0,reach: Double=230.0,width: Double=52.0,range: Double=100.0,tempo: Double=.44)=BossMoveProfile(kind,slot,reach,width,range,tempo*BossTiming.INTERVAL_SCALE)
     val profiles=mapOf(
         "ratatoskr" to p(BossMoveKind.LEAP,reach=205.0,width=49.0,tempo=.38),
         "dainn" to p(BossMoveKind.CHARGE,reach=226.0,width=54.0),

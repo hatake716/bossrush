@@ -17,7 +17,7 @@ class EnemyBarrageTest {
         val signatures=mutableSetOf<String>()
         for((stage,boss) in Bosses.all.withIndex()) {
             val p=EnemyBarrage.forBoss(boss.id); val volley=EnemyVolley(p,stage,0.0,0,300.0,265.0,x=300.0,y=125.0,aim=PI/2)
-            assertTrue(volley.warning>=.55); assertTrue(volley.speed<Job.SUMMONER.speed)
+            assertTrue(volley.warning>=.44-1e-9); assertTrue(volley.speed<Job.SUMMONER.speed)
             val bullets=(0 until p.waves).flatMap { volley.bullets(it) }
             assertTrue(bullets.size in 6..EnemyBarrage.MAX_BULLETS)
             assertTrue(bullets.all { it.heading.isFinite() && it.radius in 3.0..4.0 && it.life<=3.6 })

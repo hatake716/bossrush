@@ -4,7 +4,12 @@ import kotlin.math.*
 import kotlin.random.Random
 
 /** Encounter pacing is independent from player damage and the 30-second HP budget. */
-object BossTiming { const val SCALE = .5 }
+object BossTiming {
+    // Relative to 1.0.21: 25% faster means durations are divided by 1.25.
+    const val RATE = 1.25
+    const val INTERVAL_SCALE = 1.0 / RATE
+    const val SCALE = .5 * INTERVAL_SCALE
+}
 
 data class BossDifficulty(val stage: Int) {
     private val t=stage.coerceIn(0,31)/31.0

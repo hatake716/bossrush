@@ -1,4 +1,16 @@
-# Google Play 公開資料 — BOSSRUSH 1.0.20
+# Google Play 公開資料 — BOSSRUSH
+
+## 更新版 1.0.22（2026-09-16）
+
+- アップロード用AAB：`release/1.0.22/BOSSRUSH-1.0.22.aab`
+- データとドキュメントの一式：`release/BOSSRUSH-GooglePlay-1.0.22.zip`
+- 正式パッケージ：`io.github.hatake716.bossrush`、versionName `1.0.22` / versionCode `23`
+- [日本語リリースノート](listing/release-notes-1.0.22-ja-JP.txt)
+- [速度・弾幕の変更値と検証結果](../docs/COMBAT_TUNING_1.0.22.md)
+
+既存アプリの更新に使用するAABです。前回と同じアップロード鍵で署名します。ZIPを展開し、AABと日本語リリースノートを使用してください。今回の工程は公開用データの作成までです。
+
+## 初回公開資料 1.0.20（以下は当時の記録）
 
 Play Console への提出に必要な成果物一式です。2026-09-10 作成、versionName `1.0.20` / versionCode `21`。
 

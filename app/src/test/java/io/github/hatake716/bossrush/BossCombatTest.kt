@@ -183,7 +183,7 @@ class BossCombatTest {
                     val first=e.hazards.filter { abs(it.delay-delay)<.001 }
                     assertTrue("${boss.id}/$pattern needs a simultaneous normal",first.any { !it.ultimate })
                     assertTrue(first.any { it.ultimate })
-                    assertTrue("${boss.id}/$pattern $pos needs a shared escape",distanceToSafety(e,first)/e.job.speed+.2<=delay+.001)
+                    assertTrue("${boss.id}/$pattern $pos needs a shared escape",distanceToSafety(e,first)/e.job.speed+.16<=delay+.001)
                 }
             }
     }
@@ -204,19 +204,19 @@ class BossCombatTest {
             assertTrue(e.ultimateCount>1)
         }
     }
-    @Test fun baselineBossTimingIsHalvedAndAllFourJobsMoveTwentyPercentFaster() {
-        assertEquals(1.85/2,BossDifficulty(0).warning,.0)
-        assertEquals(.65/2,BossDifficulty(0).comboGap,.0)
-        assertEquals(1.05/2,BossDifficulty(0).recovery,.0)
-        assertEquals((1.85-.60)/2,BossDifficulty(31).warning,.0001)
+    @Test fun bossTimingAndAllFourJobsAreTwentyFivePercentFasterThanVersion121() {
+        assertEquals(1.85/2/1.25,BossDifficulty(0).warning,1e-9)
+        assertEquals(.65/2/1.25,BossDifficulty(0).comboGap,1e-9)
+        assertEquals(1.05/2/1.25,BossDifficulty(0).recovery,1e-9)
+        assertEquals((1.85-.60)/2/1.25,BossDifficulty(31).warning,.0001)
         for((i,job) in Job.entries.withIndex()) {
             val e=arena().apply { run=Run(job); nextPattern=1e9; moveX=1.0; moveY=1.0 }
             val x=e.player.x; val y=e.player.y
             repeat(10) { e.update(.02) }
-            val oldSpeed=listOf(110.0,112.0,108.0,119.0)[i]
-            assertEquals(oldSpeed*1.2*.2,hypot(e.player.x-x,e.player.y-y),.00001)
+            val oldSpeed=listOf(132.0,134.4,129.6,142.8)[i]
+            assertEquals(oldSpeed*1.25*.2,hypot(e.player.x-x,e.player.y-y),.00001)
             e.pause(); repeat(10) { e.update(.02) }
-            assertEquals(oldSpeed*1.2*.2,hypot(e.player.x-x,e.player.y-y),.00001)
+            assertEquals(oldSpeed*1.25*.2,hypot(e.player.x-x,e.player.y-y),.00001)
         }
     }
 
