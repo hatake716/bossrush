@@ -3,8 +3,10 @@ package io.github.hatake716.bossrush
 import android.graphics.*
 import kotlin.math.*
 
-/** Green pixel effects. Ground effects precede enemy warnings and the player's foot marker. */
+/** Layered pixel effects. Enemy warnings and the player collision marker remain readable. */
 class PlayerEffects {
+    private val attacks=PlayerAttackArt()
+    private val frontKinds=setOf(PlayerEffectKind.SWORD,PlayerEffectKind.KNIFE,PlayerEffectKind.GIANT,PlayerEffectKind.HANIWA)
     private val p=Paint().apply { isAntiAlias=false; strokeCap=Paint.Cap.SQUARE }
     private val path=Path()
     private fun fill(color: Int=Ink.light,alpha: Int=255) { p.color=color; p.alpha=alpha.coerceIn(0,255); p.style=Paint.Style.FILL }
@@ -48,23 +50,28 @@ class PlayerEffects {
             }
         }
         e.iceMarks.forEach { target(c,it) }
-        e.playerEffects.forEach { impact(c,it) }
+        e.playerEffects.filter { it.kind !in frontKinds }.forEach { impact(c,it) }
         p.alpha=255
     }
 
+    fun foreground(c: Canvas,e: GameEngine) {
+        e.playerEffects.filter { it.kind in frontKinds }.forEach { impact(c,it) }
+    }
+    fun summon(c: Canvas,art: PixelArt,s: Summon,scale: Double)=attacks.summon(c,art,s,scale)
+
     fun target(c: Canvas,m: IceMark) {
         val t=Skills.progress(m.level); val u=(1-m.time/.75).coerceIn(0.0,1.0)
-        stroke(1.0+t,170)
+        stroke(1.0+t,170,Color.rgb(107,239,255))
         // Eight separated frost brackets cannot be confused with a safe-zone circle.
         repeat(8) { i ->
             val a=i*PI/4; val r=m.radius
             line(c,m.x+cos(a)*(r-5),m.y+sin(a)*(r-5),m.x+cos(a)*r,m.y+sin(a)*r)
         }
-        stroke(1.0+t,150)
+        stroke(1.0+t,150,Color.rgb(64,142,255))
         polygon(c,m.x,m.y,m.radius*(.8-.45*u),4,u*PI/2)
         repeat(1+(4*t).roundToInt()) { i ->
             val a=i*2.39996; val r=if(i==0) 0.0 else m.radius*.5
-            fill(Ink.paper,180); diamond(c,m.x+cos(a)*r,m.y+sin(a)*r,3+3*t,8+u*(8+14*t))
+            fill(Color.rgb(163,247,255),180); diamond(c,m.x+cos(a)*r,m.y+sin(a)*r,3+3*t,8+u*(8+14*t))
         }
     }
 
@@ -120,73 +127,15 @@ class PlayerEffects {
                 }
                 stroke(1.0+2*t,alpha,mist); polygon(c,x,y-15,rr*.8,6,u)
             }
-            PlayerEffectKind.SWORD,PlayerEffectKind.KNIFE -> {
-                val span=if(e.kind==PlayerEffectKind.SWORD) 125.0 else 78.0
-                val direction=e.angle*180/PI
-                val layers=1+(3*t).roundToInt()
-                repeat(layers) { i ->
-                    val rr=r*(1-i*.095)*(.9+.1*sin(u*PI))
-                    val start=direction-span/2+u*span*.35+i*7
-                    stroke(5.0+4*t,alpha/2,Ink.deep)
-                    c.drawArc((x-rr).toFloat(),(y-rr).toFloat(),(x+rr).toFloat(),(y+rr).toFloat(),start.toFloat(),(span*(1-u*.35)).toFloat(),false,p)
-                    stroke((2.0+3*t)*(1-i*.13),alpha,if(i%2==0) Ink.light else Ink.paper)
-                    c.drawArc((x-rr).toFloat(),(y-rr).toFloat(),(x+rr).toFloat(),(y+rr).toFloat(),start.toFloat(),(span*(1-u*.35)).toFloat(),false,p)
-                }
-                repeat(4+(14*t).roundToInt()) { i ->
-                    val a=e.angle+(i%7-3)*.14+u*.5; val rr=r*(.58+.4*((i*17%23)/23.0))
-                    fill(if(i%2==0) Ink.light else Ink.mid,alpha)
-                    square(c,x+cos(a)*rr,y+sin(a)*rr,2+3*t)
-                }
-            }
-            PlayerEffectKind.HANIWA,PlayerEffectKind.GIANT -> {
-                val xx=x+cos(e.angle)*r*.46; val yy=y+sin(e.angle)*r*.46
-                val wave=r*.52*(.25+.75*u)
-                repeat(1+(2*t).roundToInt()) { i ->
-                    stroke(3.0+2*t,alpha/(i+1)); ring(c,xx,yy,max(2.0,wave-i*7),.65)
-                }
-                val count=6+(14*t).roundToInt()
-                repeat(count) { i ->
-                    val a=i*2.39996; val distance=wave*(.4+(i%4)*.13)
-                    val px=xx+cos(a)*distance; val py=yy+sin(a)*distance*.7-u*(10+12*t)
-                    fill(if(i%2==0) Ink.light else Ink.mid,alpha); square(c,px,py,3+5*t)
-                    if(e.kind==PlayerEffectKind.GIANT) { stroke(1.0+t,alpha); line(c,xx+cos(a)*wave*.5,yy+sin(a)*wave*.5,xx+cos(a)*wave,yy+sin(a)*wave) }
-                }
-                stroke(3.0+3*t,alpha); plus(c,xx,yy-8,r*.18*(1-u))
-            }
-            PlayerEffectKind.FIRE -> {
-                fill(Ink.mid,(50*fade).toInt()); ring(c,x,y,r)
-                stroke(2.0+3*t,alpha); ring(c,x,y,r*(.65+.35*u))
-                val count=5+(12*t).roundToInt()
-                repeat(count) { i ->
-                    val a=i*2.39996; val distance=r*.8*sqrt((i+.5)/count)
-                    val xx=x+cos(a)*distance; val yy=y+sin(a)*distance*.8
-                    val height=(14+31*t)*(1-u)*(.7+(i%3)*.3)
-                    val width=3+4*t
-                    fill(Ink.mid,alpha); square(c,xx-width,yy-height,width*2)
-                    c.drawRect((xx-width).toFloat(),(yy-height).toFloat(),(xx+width).toFloat(),yy.toFloat(),p)
-                    fill(Ink.light,alpha); c.drawRect(xx.toFloat(),(yy-height*.72).toFloat(),(xx+width*.6).toFloat(),yy.toFloat(),p)
-                    square(c,xx+sin(i+u*4)*4,yy-height-6-u*15,2+2*t)
-                }
-            }
-            PlayerEffectKind.ICE -> {
-                stroke(2.0+2*t,alpha); polygon(c,x,y,r*(.8+.2*u),6,PI/6)
-                val count=3+(8*t).roundToInt()
-                repeat(count) { i ->
-                    val a=i*2.39996; val distance=if(i==0) 0.0 else r*.75*sqrt(i.toDouble()/count)
-                    val xx=x+cos(a)*distance; val yy=y+sin(a)*distance*.7
-                    val height=(20+43*t)*(1-u*.65)*(if(i==0) 1.25 else .65+(i%3)*.13)
-                    fill(Ink.mid,alpha); diamond(c,xx,yy,5+6*t,height)
-                    stroke(1.0+1.5*t,alpha); diamond(c,xx,yy,5+6*t,height)
-                    line(c,xx,yy-height,xx,yy+height*.15)
-                    fill(Ink.light,alpha); square(c,xx+9*sin(a),yy-height-u*14-5,2+3*t)
-                }
-            }
+            PlayerEffectKind.SWORD,PlayerEffectKind.KNIFE,PlayerEffectKind.HANIWA,PlayerEffectKind.GIANT,
+            PlayerEffectKind.FIRE,PlayerEffectKind.ICE,PlayerEffectKind.FIRE_CAST,PlayerEffectKind.ICE_CAST -> attacks.impact(c,e)
             PlayerEffectKind.ARROW -> {
-                val length=(12+22*t)*(1-u*.6)
-                stroke(1.5+2*t,alpha)
-                repeat(4+(6*t).roundToInt()) { i ->
+                val length=(17+30*t)*(1-u*.6)
+                stroke(1.5+2*t,alpha,Color.rgb(255,218,134))
+                repeat(6+(10*t).roundToInt()) { i ->
                     val a=i*2.39996; line(c,x+cos(a)*3,y+sin(a)*3,x+cos(a)*length,y+sin(a)*length)
                 }
+                stroke(1.0+2*t,alpha/2,Color.rgb(255,192,78)); ring(c,x,y,length*(.4+.6*u),.7)
             }
             PlayerEffectKind.STEAL -> {
                 repeat(3+(9*t).roundToInt()) { i ->
@@ -245,23 +194,17 @@ class PlayerEffects {
     }
 
     fun projectile(c: Canvas,pr: Projectile) {
+        if(pr.delay>0) return
+        if(pr.kind!="arrow") { attacks.projectile(c,pr); return }
         val t=Skills.progress(pr.level); val a=atan2(pr.vy,pr.vx)
         c.save(); c.translate(pr.x.toFloat(),pr.y.toFloat()); c.rotate((a*180/PI).toFloat())
-        if(pr.kind=="arrow") {
+        run {
             val r=pr.radius; val length=16+13*t
-            stroke(1.0+3*t,100,Ink.mid); line(c,-length-16-16*t,0.0,-length,0.0)
-            stroke(2.0+2*t); line(c,-length,0.0,0.0,0.0)
-            fill(); path.reset(); path.moveTo(r.toFloat(),0f); path.lineTo((-r*.45).toFloat(),(-r).toFloat()); path.lineTo((-r*.45).toFloat(),r.toFloat()); path.close(); c.drawPath(path,p)
+            stroke(5.0+4*t,100,Color.rgb(246,191,76)); line(c,-length-26-23*t,0.0,-length,0.0)
+            stroke(2.0+2*t,color=Color.rgb(255,241,179)); line(c,-length,0.0,0.0,0.0)
+            fill(Color.rgb(255,241,179)); path.reset(); path.moveTo(r.toFloat(),0f); path.lineTo((-r*.45).toFloat(),(-r).toFloat()); path.lineTo((-r*.45).toFloat(),r.toFloat()); path.close(); c.drawPath(path,p)
             stroke(1.0+t); line(c,-length,-r*.7,-length+5,0.0); line(c,-length,r*.7,-length+5,0.0)
             repeat((5*t).roundToInt()) { i -> fill(Ink.paper,170-i*18); square(c,-length-i*8-5,if(i%2==0) r*.8 else -r,2+2*t) }
-        } else {
-            val r=pr.radius*(.20+.06*t)
-            repeat(3+(5*t).roundToInt()) { i ->
-                val rr=r*(1-i*.08); fill(if(i%2==0) Ink.mid else Ink.paper,220-i*20)
-                diamond(c,-i*(4+2*t),sin(pr.x*.08+i)*r*.22,rr,rr)
-            }
-            fill(Ink.light); diamond(c,0.0,0.0,r*.65,r*.75)
-            repeat(2+(6*t).roundToInt()) { i -> fill(Ink.light,150); square(c,-14.0-i*5,sin(pr.x*.1+i)*r*(.6+t*.5),2+2*t) }
         }
         c.restore(); p.alpha=255; p.style=Paint.Style.FILL
     }

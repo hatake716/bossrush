@@ -465,10 +465,9 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         p.color=Ink.light; p.style=Paint.Style.STROKE; p.strokeWidth=1f
         c.drawOval(e.boss.x.toFloat()-34,e.boss.y.toFloat()-9,e.boss.x.toFloat()+34,e.boss.y.toFloat()+17,p)
         p.style=Paint.Style.FILL
-        enemyBulletArt.draw(c,e)
         for(s in e.summons) {
             val summonScale=(if(s.kind==0) 1.2 else .85)*(1+.20*Skills.progress(s.level))
-            art.sprite(c,when(s.kind) { 0 -> "giant"; 1 -> "rabbit"; else -> "haniwa" },s.x.toFloat(),s.y.toFloat(),summonScale.toFloat())
+            playerEffects.summon(c,art,s,summonScale)
             bar(c,s.x.toFloat()-14,s.y.toFloat()+8,28f,8f,s.life,if(s.finisher) Skills.finisherDuration(e.job,s.level) else Skills.summonDuration(s.kind,s.level))
             if(s.finisher) pixel(c,"V",s.x.toFloat(),s.y.toFloat()-47,1.0f,Ink.paper,true)
         }
@@ -486,7 +485,9 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
             pixel(c,"VANISH",px,py-61,1.05f,Ink.light,true)
             bar(c,px-24,py-48,48f,5f,e.buffs.getValue("vanish"),10.0)
         }
+        playerEffects.foreground(c,e)
         e.projectiles.forEach { playerEffects.projectile(c,it) }
+        enemyBulletArt.draw(c,e)
         e.particles.forEach { q ->
             pixel(c,q.text.replace('−','-'),q.x.toFloat()+1,q.y.toFloat()+1,1.7f,Ink.dark,true)
             pixel(c,q.text.replace('−','-'),q.x.toFloat(),q.y.toFloat(),1.7f,Ink.light,true)
@@ -532,6 +533,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
                 art.icon(c,s.glyph,x+11,y+12,1.7f,if(held) Ink.dark else Ink.light)
                 pixel(c,"${if(controller.active) listOf("A","B","X","Y")[i]+" / " else ""}LV${e.levels[i]}",x+(if(controller.active) 54 else 92),y+11,1.2f,if(held) Ink.dark else Ink.mid)
                 text(c,if(e.job==Job.SUMMONER&&i==2&&e.summons.any { it.kind==2 }) "はにわで殴る" else s.name,x+69,y+58,if(s.name.length>7) 13f else 15f,if(held) Ink.dark else Ink.light,Paint.Align.CENTER)
+                if(PlayerCombos.supports(e.job,i)) pixel(c,"${e.combos.next(e.job,i,e.elapsed)}/3",x+103,y+34,1.0f,if(held) Ink.dark else Ink.paper)
                 if(i==3) {
                     text(c,e.finisherStatus,x+80,y+36,11f,if(held) Ink.dark else if(ready) Color.rgb(248,222,146) else Ink.mid,Paint.Align.CENTER)
                 } else if(!ready && e.cooldowns[i]>0) {
@@ -737,7 +739,7 @@ class GameView(context: Context,val engine: GameEngine): View(context), Choreogr
         ) else listOf(
             "01  移動と攻撃" to "戦場の左半分をドラッグして移動。右の技をタップ、長押しで連続使用。攻撃は自動でボスの方向を狙います。足元の丸が当たり判定です。",
             "02  予兆と弾幕" to "斜線は危険地帯。突進は帯の横へ、飛び込みは円の外へ。弾幕は発射の光を見て弾の間へ。弾本体に触れると被弾。カットインは入力で閉じ、輪・月印・白いルーンは内側へ。",
-            "03  技と召喚" to "技にはゲージと待機時間が必要。召喚士は回復速度が半分で仲間は2体まで。はにわは成長で耐久1〜4回・5〜20秒。再タップで近接攻撃。白ウサギの回復は8〜16。",
+            "03  コンボと召喚" to "剣・ナイフ・炎・氷は連続使用で3段コンボ。技の1/3表示は次の段。再使用可能から2.4秒以内に続けよう。魔法はLvで弾数増加。召喚は通常2体、はにわは再タップで殴る。",
             "04  必殺技とアイテム" to "4番目の技はHP1/3以下で各ボス戦1回だけ使える必殺技。ゲージ消費なし。回復には薬草や白ウサギを使います。下のアイテムを選ぶと時間が止まり、効果を確認できます。かばんは5個まで。",
             "05  成長と物語" to "撃破後に技を選び、次へ進むと確定。Lv.16が最大。盗賊は特殊品も選択。物語は前後のページへ移動・スキップが可能。ページごと、戦闘前、買い物後に自動保存。",
             "06  高いスコアへ" to "素早く倒し、被ダメージを減らすと高得点。通常モードで全32体をクリアするとタイトルがカラーに。敵の攻撃力と獲得スコアが3倍のハードモードも解放されます。"

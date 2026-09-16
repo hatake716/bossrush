@@ -29,6 +29,8 @@ class ControllerTest {
         instrumentation.targetContext.getSharedPreferences("bossrush",0).edit().clear().commit()
         rule.launchActivity(Intent())
         assertNotNull(device.wait(Until.findObject(By.desc("はじめから  →")),5000))
+        // A freshly installed app can show Android's immersive-mode overlay after its first frame.
+        device.wait(Until.findObject(By.text("Got it")),2000)?.click()
     }
     private fun <T> read(block: (GameView)->T): T {
         var result: T?=null
@@ -126,6 +128,29 @@ class ControllerTest {
         read { it.onWindowFocusChanged(false) }
         assertEquals(.0,read { it.engine.moveX },.0)
         event(KeyEvent.KEYCODE_DPAD_LEFT,KeyEvent.ACTION_UP)
+    }
+    @Test fun touchAndGamepadAdvanceTheSameThreeStageCombo() {
+        for(job in listOf(Job.WARRIOR,Job.THIEF,Job.MAGE)) for(slot in (if(job==Job.MAGE) 0..1 else 0..0)) {
+            fixture(job)
+            read { v ->
+                v.engine.boss.x=300.0; v.engine.boss.y=125.0
+                v.engine.player.x=300.0; v.engine.player.y=165.0
+                v.engine.hazards.add(Hazard("circle",-1000.0,-1000.0,1.0,delay=1e6))
+            }
+            screen(Screen.BATTLE)
+            for(stage in 1..3) {
+                read { v -> v.engine.gauge=100.0; v.engine.cooldowns[slot]=0.0 }
+                if(stage==2) {
+                    val label="技${slot+1} ${Skills.all.getValue(job)[slot].name}"
+                    (device.wait(Until.findObject(By.desc(label)),5000) ?: error(label)).click()
+                    SystemClock.sleep(100)
+                } else press(if(slot==0) KeyEvent.KEYCODE_BUTTON_A else KeyEvent.KEYCODE_BUTTON_B)
+                val snapshot=read { "${it.engine.screen} t=${it.engine.elapsed} gauge=${it.engine.gauge} cooldown=${it.engine.cooldowns[slot]} player=${it.engine.player} boss=${it.engine.boss} message=${it.engine.message}" }
+                assertEquals("$job/$slot after $stage: $snapshot",stage%3+1,read { it.engine.combos.next(job,slot,it.engine.elapsed) })
+                assertTrue(read { it.engine.cooldowns[slot] }>0)
+            }
+            screenshot("combo-input-${job.name.lowercase()}-$slot")
+        }
     }
     @Test fun fixtureInventoryTriggersUseOneItemAndNativeConfirmationSupportsGamepad() {
         fixture()

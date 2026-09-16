@@ -7,6 +7,8 @@ object SoundEffects {
     const val SAMPLE_RATE = 22050
     val durations=mapOf(
         "sword" to .25, "knife" to .15, "haniwa" to .29, "arrow" to .18,
+        "sword-2" to .29, "sword-3" to .40, "knife-2" to .22, "knife-3" to .33,
+        "fire-2" to .38, "fire-3" to .46, "ice-2" to .41, "ice-3" to .48,
         "fire" to .32, "ice" to .35, "arrow-hit" to .17, "fire-hit" to .36,
         "ice-hit" to .30, "giant-hit" to .33, "summon-giant" to .55,
         "summon-rabbit" to .48, "summon-haniwa" to .43, "shield" to .32,
@@ -33,11 +35,19 @@ object SoundEffects {
         }
         val sound=when(kind) {
             "sword" -> noise*exp(-t*23)*.54+tone(980.0,-2800.0)*exp(-t*12)*.40
+            "sword-2" -> (noise*.5+tone(1250.0,-3200.0)*.45)*exp(-t*13)
+            "sword-3" -> (noise*.44+tone(480.0,-750.0,.5)*.45+bell(960.0)*.2)*exp(-t*9)
             "knife" -> noise*exp(-t*40)*.35+tone(1650.0,-6000.0,.125)*exp(-t*24)*.65
+            "knife-2" -> (noise*.35+tone(1900.0,-5500.0,.125)*.5)*exp(-(t%.085)*30)*exp(-t*6)
+            "knife-3" -> (noise*.4+bell(1700.0)*.5)*exp(-(t%.07)*40)*exp(-t*7)
             "haniwa" -> sin(2*PI*(160*t-180*t*t))*exp(-t*21)*.65+noise*exp(-t*65)*.28
             "arrow" -> noise*exp(-t*30)*.45+tone(1450.0,-5200.0)*exp(-t*32)*.38
             "fire" -> noise*(1-u)*.42+tone(150.0,2100.0)*exp(-t*10)*.40
+            "fire-2" -> (noise*.5+tone(220.0,1650.0)*.3)*exp(-t*6)
+            "fire-3" -> (noise*.5+tone(90.0,1900.0,.5)*.32+bell(660.0)*.12)*exp(-t*4)
             "ice" -> (bell(1380.0)+bell(2070.0)*.45)*exp(-t*10)*.50
+            "ice-2" -> (bell(1640.0)+bell(2460.0)*.42)*exp(-t*8)*.52
+            "ice-3" -> (bell(1100.0)+bell(1650.0)*.5+tone(2200.0,500.0)*.2)*exp(-t*6)*.48
             "arrow-hit" -> noise*exp(-t*58)*.50+tone(420.0,-1300.0)*exp(-t*27)*.48
             "fire-hit" -> noise*exp(-t*14)*.52+sin(2*PI*(100*t+1.8*(1-exp(-t*60))))*exp(-t*15)*.46
             "ice-hit" -> (bell(1860.0)+noise*.3)*exp(-t*20)*.58

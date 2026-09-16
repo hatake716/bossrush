@@ -2,22 +2,26 @@ package io.github.hatake716.bossrush
 
 import kotlin.math.*
 
-enum class PlayerEffectKind { SWORD, KNIFE, HANIWA, GIANT, ARROW, FIRE, ICE, SHIELD, FOCUS, SPEED, STEAL, SUMMON_GIANT, SUMMON_RABBIT, SUMMON_HANIWA, HEAL, LIMIT_SLASH, LIMIT_FLARE, LIMIT_SUMMON, LIMIT_VANISH }
+enum class PlayerEffectKind { SWORD, KNIFE, HANIWA, GIANT, ARROW, FIRE, ICE, SHIELD, FOCUS, SPEED, STEAL, SUMMON_GIANT, SUMMON_RABBIT, SUMMON_HANIWA, HEAL, LIMIT_SLASH, LIMIT_FLARE, LIMIT_SUMMON, LIMIT_VANISH, FIRE_CAST, ICE_CAST }
 
 /** A snapshot of one successful action. Drawing an effect never applies damage. */
 data class PlayerEffect(
     val kind: PlayerEffectKind, val x: Double, val y: Double, val radius: Double,
-    val level: Int, val angle: Double=0.0, var age: Double=0.0
+    val level: Int, val angle: Double=0.0, var age: Double=0.0, val combo: Int=1,
+    val targetX: Double=x+cos(angle)*radius*.65, val targetY: Double=y+sin(angle)*radius*.65
 ) {
     val strength: Double get()=Skills.progress(level)
     val lifetime: Double get()=when(kind) {
         PlayerEffectKind.SUMMON_GIANT,PlayerEffectKind.SUMMON_RABBIT,PlayerEffectKind.SUMMON_HANIWA,PlayerEffectKind.HEAL,PlayerEffectKind.LIMIT_SUMMON,PlayerEffectKind.LIMIT_VANISH -> .65+.25*strength
         PlayerEffectKind.LIMIT_SLASH -> .34+.14*strength
         PlayerEffectKind.LIMIT_FLARE -> .55+.15*strength
+        PlayerEffectKind.SWORD,PlayerEffectKind.KNIFE -> .38+.18*strength+.04*(combo-1)
+        PlayerEffectKind.GIANT,PlayerEffectKind.HANIWA -> SummonPunch.DURATION+.16*strength
+        PlayerEffectKind.FIRE,PlayerEffectKind.ICE -> .42+.22*strength
         else -> .30+.18*strength
     }
     val progress: Double get()=(age/lifetime).coerceIn(0.0,1.0)
-    companion object { const val LIMIT=48 }
+    companion object { const val LIMIT=72 }
 }
 
 object PlayerAttackGeometry {

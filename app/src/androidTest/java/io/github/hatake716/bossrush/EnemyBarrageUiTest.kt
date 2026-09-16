@@ -66,7 +66,7 @@ class EnemyBarrageUiTest {
     @Test fun touchPauseFreezesBulletsAndCutinAndVictoryRemoveThem() {
         Configurator.getInstance().waitForIdleTimeout=100
         ins.targetContext.getSharedPreferences("bossrush",0).edit().clear().commit()
-        rule.launchActivity(Intent()); device.findObject(By.text("Got it"))?.click()
+        rule.launchActivity(Intent()); device.wait(Until.findObject(By.text("Got it")),2000)?.click()
         assertTrue(device.wait(Until.hasObject(By.desc("はじめから  →")),5000))
         read { v ->
             val e=v.engine; e.run=Run(Job.WARRIOR,stage=31,kills=31); e.beginBattle(); e.player.hp=100000.0; e.player.maxHp=100000.0

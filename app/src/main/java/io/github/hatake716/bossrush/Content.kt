@@ -14,13 +14,13 @@ data class Skill(val name: String, val glyph: String, val power: Double, val coo
 object Skills {
     val all = mapOf(
         Job.WARRIOR to listOf(
-            Skill("剣", "sword", 144.0, .95, 67.0, 16.0, "近くの敵を強く斬る。ボスの近くで使おう。"),
+            Skill("剣", "sword", 144.0, .95, 67.0, 16.0, "連続使用で薙ぎ・切り返し・回転斬りの3段コンボ。"),
             Skill("盾", "shield", 0.0, 8.0, 0.0, 20.0, "4秒間、受けるダメージを軽減。"),
             Skill("弓", "bow", 44.0, 1.8, 650.0, 14.0, "ボスに向かって矢を飛ばす、弱い遠距離攻撃。"),
             Skill("瞬刃十連", "limit-sword", 240.0, 0.0, 0.0, 0.0, "HP1/3以下・各戦1回。瞬時にボスへ10連続強攻撃。")),
         Job.MAGE to listOf(
-            Skill("炎", "fire", 88.0, 1.15, 38.0, 19.0, "真っすぐ飛び、着弾地点を巻き込む範囲魔法。"),
-            Skill("氷", "ice", 92.0, 1.65, 38.0, 22.0, "0.4秒追尾した地点に、氷を落とす。"),
+            Skill("炎", "fire", 88.0, 1.15, 38.0, 19.0, "炎の3段コンボ。レベルが上がると火球の弾幕に成長。"),
+            Skill("氷", "ice", 92.0, 1.65, 38.0, 22.0, "氷の3段コンボ。照準固定後、成長した氷弾が集中。"),
             Skill("魔力を高める", "boost", 0.0, 9.0, 0.0, 18.0, "5秒間、攻撃力が上昇。炎と氷の前に使おう。"),
             Skill("終焔五重奏", "limit-flare", 480.0, 0.0, 0.0, 0.0, "HP1/3以下・各戦1回。全域に5連続の大爆発。")),
         Job.SUMMONER to listOf(
@@ -29,7 +29,7 @@ object Skills {
             Skill("はにわを呼ぶ", "haniwa", 64.0, 1.25, 68.0, 40.0, "被ダメージを肩代わり。耐久・持続が成長。再使用で殴る。"),
             Skill("五巨人の進軍", "limit-giants", 96.0, 0.0, 65.0, 0.0, "HP1/3以下・各戦1回。別枠で巨人を5体召喚。")),
         Job.THIEF to listOf(
-            Skill("ナイフ", "knife", 100.0, .9, 59.0, 15.0, "小さな刃で素早く斬る、中威力の近接攻撃。"),
+            Skill("ナイフ", "knife", 100.0, .9, 59.0, 15.0, "突き・交差斬り・連続斬撃の3段コンボ。"),
             Skill("盗む", "steal", 0.0, 8.0, 77.0, 25.0, "近くで特殊アイテムを盗む。各ボス1回まで。"),
             Skill("気合いをいれる", "speed", 0.0, 8.0, 0.0, 16.0, "5秒間、移動速度が上昇。予兆を素早く回避。"),
             Skill("無影の極意", "limit-vanish", 0.0, 0.0, 0.0, 0.0, "HP1/3以下・各戦1回。姿を消して10秒間無敵。"))
@@ -44,7 +44,9 @@ object Skills {
     fun auraRadius(level: Int) = 22.0 * (1 + .6 * progress(level))
     fun haniwaDurability(level: Int) = 1+(level.coerceIn(1,16)-1)/5
     fun summonDuration(kind: Int, level: Int) = if(kind==2) level.coerceIn(1,16)+4.0 else 12.0+8*progress(level)
-    fun description(job: Job, slot: Int, level: Int) = if(job==Job.SUMMONER && slot==2)
+    fun description(job: Job, slot: Int, level: Int) = if(job==Job.MAGE && slot<2)
+        "連続使用で3段コンボ。弾数 ${PlayerMagic.count(level,1)}/${PlayerMagic.count(level,2)}/${PlayerMagic.count(level,3)}。\n${if(slot==0) "前方へ火球を放つ。" else "照準地点へ氷弾が集中。"}"
+        else if(job==Job.SUMMONER && slot==2)
         "耐久${haniwaDurability(level)}回 / 持続${summonDuration(2,level).toInt()}秒。\n身代わり。再使用で殴る。"
         else all.getValue(job)[slot].description
     fun finisherDuration(job: Job, level: Int) = if(job==Job.SUMMONER) 12.0+8*progress(level) else if(job==Job.THIEF) 10.0 else 0.0

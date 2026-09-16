@@ -30,7 +30,7 @@ class SummonBalanceTest {
             assertEquals(attack.shape,1.0,e.player.hp,0.0)
             assertEquals(0.0,e.damageTaken,0.0); assertEquals(Screen.BATTLE,e.screen)
             assertTrue(e.summons.isEmpty()); assertTrue(e.sounds.contains("haniwa"))
-            assertTrue(e.playerEffects.any { it.kind==PlayerEffectKind.HANIWA })
+            assertTrue(e.playerEffects.any { it.kind==PlayerEffectKind.SHIELD })
             e.hurt(1.0); assertEquals(Screen.GAMEOVER,e.screen)
             assertEquals(1.0,e.run!!.totalDamage,0.0)
         }

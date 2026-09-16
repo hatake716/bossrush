@@ -34,19 +34,20 @@ class PlayerGrowthTest {
         }
     }
 
-    @Test fun upgradedArrowAndFireCatchGrazesThatLevelOneMissesAndHitOnlyOnce() {
+    @Test fun upgradedArrowAndFireCatchGrazesWithoutExceedingTheCastDamageBudget() {
         for((job,slot,offset) in listOf(Triple(Job.WARRIOR,2,33.0),Triple(Job.MAGE,0,74.0))) {
             for(level in listOf(1,16)) {
                 val e=battle(job,level); e.player.y=285.0
-                assertTrue(e.useSkill(slot)); val projectile=e.projectiles.single()
-                assertEquals(level,projectile.level)
+                assertTrue(e.useSkill(slot)); assertTrue(e.projectiles.all { it.level==level })
+                assertEquals(e.power(slot),e.projectiles.sumOf { it.power },1e-7)
                 e.boss.x+=offset
                 tick(e,1.2)
                 if(level==1) assertEquals(0.0,e.damageDone,0.0)
                 else {
-                    assertEquals(e.power(slot),e.damageDone,1e-7)
+                    assertTrue(e.damageDone>0); assertTrue(e.damageDone<=e.power(slot)+1e-7)
+                    val damage=e.damageDone
+                    tick(e,2.0); assertEquals(damage,e.damageDone,1e-7)
                     assertTrue(e.projectiles.isEmpty())
-                    tick(e,2.0); assertEquals(e.power(slot),e.damageDone,1e-7)
                 }
             }
         }
@@ -55,7 +56,7 @@ class PlayerGrowthTest {
     @Test fun fireImpactUsesContactPointAndFullBlastRadius() {
         val e=battle(Job.MAGE,16); e.player.y=285.0; e.useSkill(0)
         repeat(120) { if(e.playerEffects.none { it.kind==PlayerEffectKind.FIRE }) e.update(1.0/120) }
-        val effect=e.playerEffects.single { it.kind==PlayerEffectKind.FIRE }
+        val effect=e.playerEffects.first { it.kind==PlayerEffectKind.FIRE }
         assertEquals(60.8,effect.radius,1e-8)
         assertEquals(effect.radius+PlayerAttackGeometry.BOSS_RADIUS,hypot(effect.x-e.boss.x,effect.y-e.boss.y),1e-6)
         assertEquals(16,effect.level)
@@ -66,7 +67,7 @@ class PlayerGrowthTest {
             val e=battle(Job.MAGE,level); assertTrue(e.useSkill(1)); tick(e,.43)
             val mark=e.iceMarks.single(); assertTrue(mark.time<.35)
             e.boss.x+=74; tick(e,.34)
-            assertEquals(if(level==1) 0.0 else e.power(1),e.damageDone,1e-8)
+            assertEquals(if(level==1) 0.0 else e.power(1)/PlayerMagic.count(level,1),e.damageDone,1e-8)
             val fx=e.playerEffects.single { it.kind==PlayerEffectKind.ICE }
             assertEquals(mark.radius,fx.radius,0.0); assertEquals(300.0,fx.x,0.0); assertEquals(level,fx.level)
         }

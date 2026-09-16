@@ -1,6 +1,17 @@
 # Google Play 公開資料 — BOSSRUSH
 
-## 更新版 1.0.22（2026-09-16）
+## 最新版 1.0.23（2026-09-16）
+
+- アップロード用AAB：`release/1.0.23/BOSSRUSH-1.0.23.aab`
+- データとドキュメントの一式：`release/BOSSRUSH-GooglePlay-1.0.23.zip`
+- 正式パッケージ：`io.github.hatake716.bossrush`、versionName `1.0.23` / versionCode `24`
+- [日本語リリースノート](listing/release-notes-1.0.23-ja-JP.txt)
+- [更新したストア詳細説明](listing/store-description-1.0.23-ja-JP.txt)
+- [3段コンボ・魔法弾幕・攻撃演出の仕様](../docs/PLAYER_COMBOS_1.0.23.md)
+
+前回と同じアップロード鍵で署名した、既存アプリの更新用AABです。ZIPには仕様・リリースノート・ストア説明・検証ログ・画面画像を含めます。Play Consoleへのアップロード・審査提出・公開はこの作業に含みません。
+
+## 前回更新 1.0.22（2026-09-16）
 
 - アップロード用AAB：`release/1.0.22/BOSSRUSH-1.0.22.aab`
 - データとドキュメントの一式：`release/BOSSRUSH-GooglePlay-1.0.22.zip`
